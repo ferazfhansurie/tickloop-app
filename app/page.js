@@ -22,7 +22,14 @@ export default function Page() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const result = new URLSearchParams(window.location.search).get("tiktok");
+    if (result) {
+      setNotice(result === "connected" ? "TikTok Shop is connected." : "TikTok Shop could not complete connection. Please try again.");
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
 
   async function authenticate(event) {
     event.preventDefault(); setLoading(true); setError("");
