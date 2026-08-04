@@ -40,6 +40,17 @@ export async function POST(request) {
       await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at) VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${body.messageId},'inbound',${body.body},to_timestamp(${body.timestamp || Math.floor(Date.now() / 1000)})) ON CONFLICT (external_id) DO NOTHING`;
       return NextResponse.json({ ok: true });
     }
+    if (body.type === "sync") {
+      const chat = body.chat || {}; if (!chat.chatId || !Array.isArray(chat.messages)) return NextResponse.json({ error: "Invalid chat sync payload." }, { status: 400 });
+      const conversationId = `cv_${createHash("sha256").update(`${connection.workspace_id}:${chat.chatId}`).digest("hex").slice(0, 24)}`;
+      const timestamp = Number(chat.timestamp) || Math.floor(Date.now() / 1000);
+      await q`INSERT INTO tl_conversations (id,workspace_id,provider,external_id,customer_name,customer_phone,avatar_url,last_message_at) VALUES (${conversationId},${connection.workspace_id},'whatsapp',${chat.chatId},${chat.name || null},${chat.phone || null},${chat.avatarUrl || null},to_timestamp(${timestamp})) ON CONFLICT (workspace_id,provider,external_id) DO UPDATE SET customer_name=COALESCE(EXCLUDED.customer_name,tl_conversations.customer_name),customer_phone=COALESCE(EXCLUDED.customer_phone,tl_conversations.customer_phone),avatar_url=COALESCE(EXCLUDED.avatar_url,tl_conversations.avatar_url),last_message_at=GREATEST(EXCLUDED.last_message_at,tl_conversations.last_message_at)`;
+      for (const message of chat.messages.slice(-50)) {
+        if (!message.id || typeof message.body !== "string") continue;
+        await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at) VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${message.id},${message.fromMe ? "outbound" : "inbound"},${message.body},to_timestamp(${Number(message.timestamp) || timestamp})) ON CONFLICT (external_id) DO NOTHING`;
+      }
+      return NextResponse.json({ ok: true });
+    }
     return NextResponse.json({ error: "Unsupported worker event." }, { status: 400 });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Worker event failed." }, { status: 500 });
