@@ -15,7 +15,7 @@ export async function POST(request) {
     if (existing?.status === "connected") return NextResponse.json({ alreadyConnected: true, appUrl: new URL(request.url).origin });
     const savedToken = decryptCredentials(existing?.credentials)?.workerToken;
     if (savedToken) {
-      const metadata = { ...(existing.metadata || {}), workerTokenHash: createHash("sha256").update(savedToken).digest("hex"), pairExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), worker: "whatsapp-web.js", qrDataUrl: null };
+      const metadata = { ...(existing.metadata || {}), workerTokenHash: createHash("sha256").update(savedToken).digest("hex"), pairExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), worker: "whatsapp-web.js" };
       await q`UPDATE tl_connections SET status='pairing',metadata=${JSON.stringify(metadata)}::jsonb,updated_at=now() WHERE id=${existing.id}`;
       return NextResponse.json({ token: savedToken, appUrl: new URL(request.url).origin, expiresAt: metadata.pairExpiresAt });
     }
