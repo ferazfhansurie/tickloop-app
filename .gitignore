@@ -4,3 +4,4 @@
 node_modules
 whatsapp-worker/.sessions
 whatsapp-worker/.tickloop-worker.json
+whatsapp-worker/.wwebjs_cache

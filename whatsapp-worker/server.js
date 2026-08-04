@@ -23,12 +23,13 @@ const client = new Client({
 
 async function report(body) {
   const response = await fetch(`${appUrl}/api/whatsapp/worker`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
-  if (!response.ok) throw new Error(`TickLoop rejected worker event (${response.status}).`);
+  if (!response.ok) throw new Error(`TickLoop rejected worker event (${response.status}): ${await response.text()}`);
 }
 
 client.on("qr", async value => { qrImage = await QRCode.toDataURL(value, { margin: 1, width: 320 }); state = "Scan this QR code from WhatsApp → Linked devices."; report({ type: "qr", qrDataUrl: qrImage }).catch(console.error); });
 client.on("authenticated", () => { state = "WhatsApp authenticated. Finishing setup…"; report({ type: "status", status: "authenticated" }).catch(console.error); });
-client.on("ready", async () => { const info = client.info || {}; state = "Connected to TickLoop."; await report({ type: "status", status: "ready", phone: info.wid?.user || null }); });
+let connectedPhone = null;
+client.on("ready", async () => { const info = client.info || {}; connectedPhone = info.wid?.user || null; state = "Connected to TickLoop."; await report({ type: "status", status: "ready", phone: connectedPhone }); });
 client.on("auth_failure", message => { state = `Authentication failed: ${message}`; });
 client.on("disconnected", reason => { state = `Disconnected: ${reason}`; report({ type: "status", status: "disconnected" }).catch(console.error); });
 client.on("message", message => {
@@ -38,4 +39,5 @@ client.on("message", message => {
 
 app.get("/", (_request, response) => response.type("html").send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>TickLoop WhatsApp</title><style>body{font-family:system-ui;background:#f5f8f5;color:#17221b;display:grid;place-items:center;min-height:100vh;margin:0}.card{background:#fff;border:1px solid #dce6de;border-radius:20px;padding:30px;max-width:390px;text-align:center}img{width:100%;max-width:320px}.muted{color:#6d7a72;font-size:14px}</style></head><body><main class="card"><h1>TickLoop WhatsApp</h1><p>${state}</p>${qrImage ? `<img src="${qrImage}" alt="WhatsApp QR code">` : ""}<p class="muted">This page stays on your laptop.</p></main><script>setTimeout(()=>location.reload(),2500)</script></body></html>`));
 app.listen(port, "127.0.0.1", () => console.log(`Open http://127.0.0.1:${port} to scan the WhatsApp QR code.`));
+setInterval(() => { if (connectedPhone) report({ type: "status", status: "ready", phone: connectedPhone }).catch(console.error); }, 60000).unref();
 client.initialize();
