@@ -14,6 +14,7 @@ const chromePath = process.env.CHROME_PATH || (fs.existsSync(defaultChrome) ? de
 
 let qrImage = "";
 let state = "Starting WhatsApp Web…";
+let syncAttempts = 0;
 const app = express();
 const port = Number(process.env.PORT || 3333);
 const client = new Client({
@@ -40,14 +41,21 @@ async function pullOutbox() {
 }
 
 async function syncExistingChats() {
-  const chats = (await client.getChats()).filter(chat => !chat.isGroup && !chat.id._serialized.includes("status@broadcast")).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 100);
-  for (const chat of chats) {
-    try {
-      const contact = await chat.getContact();
-      const avatarUrl = await client.getProfilePicUrl(chat.id._serialized).catch(() => null);
-      const messages = await chat.fetchMessages({ limit: 50 });
-      await report({ type: "sync", chat: { chatId: chat.id._serialized, name: contact.pushname || contact.name || chat.name || contact.number || "WhatsApp contact", phone: contact.number || chat.id.user || null, avatarUrl, timestamp: chat.timestamp || Math.floor(Date.now() / 1000), messages: messages.map(message => ({ id: message.id._serialized, body: message.body || "", timestamp: message.timestamp, fromMe: message.fromMe })) } });
-    } catch (error) { console.error("Could not sync a WhatsApp chat:", error.message); }
+  try {
+    const chats = (await client.getChats()).filter(chat => !chat.isGroup && !chat.id._serialized.includes("status@broadcast")).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 100);
+    for (const chat of chats) {
+      try {
+        const contact = await chat.getContact();
+        const avatarUrl = await client.getProfilePicUrl(chat.id._serialized).catch(() => null);
+        const messages = await chat.fetchMessages({ limit: 50 });
+        await report({ type: "sync", chat: { chatId: chat.id._serialized, name: contact.pushname || contact.name || chat.name || contact.number || "WhatsApp contact", phone: contact.number || chat.id.user || null, avatarUrl, timestamp: chat.timestamp || Math.floor(Date.now() / 1000), messages: messages.map(message => ({ id: message.id._serialized, body: message.body || "", timestamp: message.timestamp, fromMe: message.fromMe })) } });
+      } catch (error) { console.error("Could not sync a WhatsApp chat:", error.message); }
+    }
+    syncAttempts = 0; state = "Connected to TickLoop.";
+  } catch (error) {
+    syncAttempts += 1; state = "Connected to TickLoop. Retrying chat import…";
+    if (syncAttempts <= 5) setTimeout(() => syncExistingChats().catch(console.error), 30000).unref();
+    throw error;
   }
 }
 
