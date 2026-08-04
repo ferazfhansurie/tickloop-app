@@ -27,7 +27,9 @@ export async function POST(request) {
       return NextResponse.json({ ok: true });
     }
     if (body.type === "status") {
-      const status = body.status === "ready" ? "connected" : body.status === "disconnected" ? "pending" : "pairing";
+      // An existing LocalAuth session emits "authenticated" on every worker restart.
+      // Keep a healthy connection connected until WhatsApp explicitly reports a disconnect.
+      const status = body.status === "ready" ? "connected" : body.status === "disconnected" ? "pending" : connection.status === "connected" ? "connected" : "pairing";
       await q`UPDATE tl_connections SET status=${status},external_id=${body.phone || null},metadata=CASE WHEN ${status}='connected' THEN metadata - 'qrDataUrl' ELSE metadata END,updated_at=now() WHERE id=${connection.id}`;
       return NextResponse.json({ ok: true, status });
     }
