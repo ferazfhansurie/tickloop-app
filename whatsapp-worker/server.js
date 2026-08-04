@@ -24,7 +24,7 @@ async function report(body) {
   if (!response.ok) throw new Error(`TickLoop rejected worker event (${response.status}).`);
 }
 
-client.on("qr", async value => { qrImage = await QRCode.toDataURL(value, { margin: 1, width: 320 }); state = "Scan this QR code from WhatsApp → Linked devices."; });
+client.on("qr", async value => { qrImage = await QRCode.toDataURL(value, { margin: 1, width: 320 }); state = "Scan this QR code from WhatsApp → Linked devices."; report({ type: "qr", qrDataUrl: qrImage }).catch(console.error); });
 client.on("authenticated", () => { state = "WhatsApp authenticated. Finishing setup…"; report({ type: "status", status: "authenticated" }).catch(console.error); });
 client.on("ready", async () => { const info = client.info || {}; state = "Connected to TickLoop."; await report({ type: "status", status: "ready", phone: info.wid?.user || null }); });
 client.on("auth_failure", message => { state = `Authentication failed: ${message}`; });
