@@ -51,6 +51,7 @@ export default function Page() {
     const data = await response.json();
     if (!response.ok) return setNotice(data.error || "Connection could not start.");
     if (data.authorizationUrl) return window.location.assign(data.authorizationUrl);
+    if (data.pairingUrl) return window.location.assign(data.pairingUrl);
     setNotice(data.message); await load();
   }
 
