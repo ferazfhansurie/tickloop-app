@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { createSession, registerUser, sessionCookie } from "../../../../lib/auth";
+export const runtime = "nodejs";
+export async function POST(request) { try { const body = await request.json(); if (!body?.name?.trim() || !/^\S+@\S+\.\S+$/.test(body.email || "") || typeof body.password !== "string" || body.password.length < 8) return NextResponse.json({ error: "Enter your name, a valid email, and a password of at least 8 characters." }, { status: 400 }); const user = await registerUser(body); const response = NextResponse.json({ user: { name: user.name, email: user.email } }, { status: 201 }); return sessionCookie(response, await createSession(user.id)); } catch (error) { return NextResponse.json({ error: error.message || "Could not create your account." }, { status: error.status || 500 }); } }
