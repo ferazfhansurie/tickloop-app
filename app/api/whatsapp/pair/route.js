@@ -11,6 +11,14 @@ export async function POST(request) {
     if (!user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
     await ensureSchema();
     const q = database();
+    const existing = (await q`SELECT id,status,metadata,credentials FROM tl_connections WHERE workspace_id=${user.workspace_id} AND provider='whatsapp' LIMIT 1`)[0];
+    if (existing?.status === "connected") return NextResponse.json({ alreadyConnected: true, appUrl: new URL(request.url).origin });
+    const savedToken = decryptCredentials(existing?.credentials)?.workerToken;
+    if (savedToken) {
+      const metadata = { ...(existing.metadata || {}), workerTokenHash: createHash("sha256").update(savedToken).digest("hex"), pairExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), worker: "whatsapp-web.js", qrDataUrl: null };
+      await q`UPDATE tl_connections SET status='pairing',metadata=${JSON.stringify(metadata)}::jsonb,updated_at=now() WHERE id=${existing.id}`;
+      return NextResponse.json({ token: savedToken, appUrl: new URL(request.url).origin, expiresAt: metadata.pairExpiresAt });
+    }
     const token = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const metadata = { workerTokenHash: tokenHash, pairExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), worker: "whatsapp-web.js" };

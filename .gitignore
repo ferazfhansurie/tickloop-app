@@ -3,3 +3,4 @@
 .next
 node_modules
 whatsapp-worker/.sessions
+whatsapp-worker/.tickloop-worker.json

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tickloop.whatsapp-worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/tmp/tickloop-onboarding-web/whatsapp-worker/server.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/tmp/tickloop-onboarding-web/whatsapp-worker</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/tickloop-whatsapp-worker.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/tickloop-whatsapp-worker-error.log</string>
+</dict>
+</plist>

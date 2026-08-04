@@ -4,8 +4,10 @@ const express = require("express");
 const QRCode = require("qrcode");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 
-const appUrl = (process.env.TICKLOOP_URL || "").replace(/\/$/, "");
-const token = process.env.TICKLOOP_WORKER_TOKEN;
+const configPath = path.join(__dirname, ".tickloop-worker.json");
+const localConfig = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, "utf8")) : {};
+const appUrl = (process.env.TICKLOOP_URL || localConfig.appUrl || "").replace(/\/$/, "");
+const token = process.env.TICKLOOP_WORKER_TOKEN || localConfig.workerToken;
 if (!appUrl || !token) throw new Error("Set TICKLOOP_URL and TICKLOOP_WORKER_TOKEN using the command shown in TickLoop.");
 const defaultChrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const chromePath = process.env.CHROME_PATH || (fs.existsSync(defaultChrome) ? defaultChrome : undefined);
