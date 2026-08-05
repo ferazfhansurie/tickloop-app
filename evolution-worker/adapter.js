@@ -110,7 +110,10 @@ function normaliseMessage(entry) {
     body: textFrom(message),
     timestamp: Number(entry?.messageTimestamp || entry?.message?.messageTimestamp || entry?.timestamp || Math.floor(Date.now() / 1000)),
     pushName: entry?.pushName || entry?.pushname || entry?.senderName || null,
-    phone: String(chatId).replace(/@.+$/, ""),
+    // A WhatsApp "@lid" is a hidden-identity handle, NOT a phone number — storing
+    // its digits made the inbox show things like "28347136504059" as the contact's
+    // number. Only real @s.whatsapp.net JIDs carry a dialable number.
+    phone: String(chatId).endsWith("@lid") ? null : String(chatId).replace(/@.+$/, ""),
     fromMe: Boolean(key.fromMe || entry?.fromMe),
     avatarUrl: entry?.profilePicUrl || entry?.profilePictureUrl || null,
   };
@@ -171,7 +174,7 @@ async function backfillHistory() {
           chat: {
             chatId: jid,
             name: chat.pushName || "WhatsApp contact",
-            phone: jid.replace(/@.+$/, ""),
+            phone: jid.endsWith("@lid") ? null : jid.replace(/@.+$/, ""),
             avatarUrl: chat.profilePicUrl || null,
             timestamp: slice[slice.length - 1].timestamp,
             messages: slice,
@@ -185,6 +188,13 @@ async function backfillHistory() {
     }
 
     backfillDone = true;
+    // Same person can land twice (an @lid handle plus a phone JID); fold them together.
+    const dedupe = await fetch(tickloopUrl + "/api/whatsapp/worker", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + workerToken },
+      body: JSON.stringify({ type: "merge_duplicates" }),
+    }).then(response => response.json()).catch(() => null);
+    if (dedupe?.merged) console.log(`Merged ${dedupe.merged} duplicate conversation(s).`);
     await report({ type: "sync_status", status: "complete", imported, total: available });
     console.log(`History backfill complete: ${imported} messages from ${list.length} chats.`);
   } catch (error) {
