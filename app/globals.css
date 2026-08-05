@@ -94,3 +94,9 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .forwardList button:hover{background:#edf8ef}
 .forwardList button:disabled{opacity:.5}
 @media(max-width:700px){.mediaImage,.mediaVideo{max-width:70vw}}
+/* Download-first attachments (WhatsApp behaviour): card until fetched. */
+.mediaDownload{border:0;cursor:pointer;font:inherit;text-align:left;width:100%}
+.mediaDownload:disabled{cursor:default}
+.mediaDownload.gone{opacity:.6;cursor:not-allowed}
+.mediaDownload .mediaIcon{background:var(--green);color:#fff}
+.mediaDownload.gone .mediaIcon{background:#c9d3cc;color:#5d6b62}

@@ -198,10 +198,20 @@ async function backfillHistory() {
       const records = payload?.messages?.records || payload?.records || (Array.isArray(payload) ? payload : []);
       available += Number(payload?.messages?.total) || records.length;
 
+      // Ship the WhatsApp key alongside each message instead of downloading every
+      // attachment up front — the user pulls the ones they actually want, and the
+      // key is what makes that possible later.
       const messages = records
-        .map(normaliseMessage)
-        .filter(item => item && item.body)
-        .map(item => ({ id: item.messageId, body: item.body, timestamp: item.timestamp, fromMe: item.fromMe }));
+        .map(record => ({ item: normaliseMessage(record), record }))
+        .filter(({ item }) => item && item.body)
+        .map(({ item, record }) => ({
+          id: item.messageId,
+          body: item.body,
+          timestamp: item.timestamp,
+          fromMe: item.fromMe,
+          mediaKind: mediaKindOf(record),
+          waKey: mediaKindOf(record) ? record.key : null,
+        }));
       if (!messages.length) continue;
       messages.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -221,31 +231,6 @@ async function backfillHistory() {
         });
         imported += slice.length;
       }
-      // Second pass: attach real attachments to the newest media messages. These
-      // go one per call because base64 payloads are large; the server upserts them
-      // onto the rows the text pass just created.
-      const mediaRecords = records
-        .filter(record => mediaKindOf(record))
-        .sort((a, b) => Number(b.messageTimestamp || 0) - Number(a.messageTimestamp || 0))
-        .slice(0, MEDIA_PER_CHAT);
-      for (const record of mediaRecords) {
-        const item = normaliseMessage(record);
-        if (!item) continue;
-        const media = await fetchMedia(record.key, mediaKindOf(record));
-        if (!media) continue;
-        await report({
-          type: "sync",
-          chat: {
-            chatId: jid,
-            name: chat.pushName || "WhatsApp contact",
-            phone: jid.endsWith("@lid") ? null : jid.replace(/@.+$/, ""),
-            avatarUrl: chat.profilePicUrl || null,
-            timestamp: item.timestamp,
-            messages: [{ id: item.messageId, body: item.body, timestamp: item.timestamp, fromMe: item.fromMe, media }],
-          },
-        }).catch(() => {});
-      }
-
       historyChats.add(jid);
       historyCount = imported;
       await report({ type: "sync_status", status: "syncing", imported, total: available }).catch(() => {});
@@ -302,6 +287,30 @@ async function refreshState() {
   ready = false;
   const qr = await evolution(`/instance/connect/${instanceName}`, { method: "GET" }).catch(() => null);
   await reportQr(qr);
+}
+
+// Drain download requests: the user tapped an attachment in TickLoop, so fetch
+// the bytes from Evolution and hand them back. Anything WhatsApp has expired is
+// reported as unavailable so the UI stops offering it.
+let mediaBusy = false;
+async function pullMediaQueue() {
+  if (!ready || mediaBusy) return;
+  mediaBusy = true;
+  try {
+    const response = await fetch(tickloopUrl + "/api/whatsapp/media-queue", { headers: { authorization: "Bearer " + workerToken } });
+    if (!response.ok) return;
+    const items = (await response.json()).items || [];
+    for (const item of items) {
+      const media = item.wa_key ? await fetchMedia(item.wa_key, item.media_kind) : null;
+      await fetch(tickloopUrl + "/api/whatsapp/media-queue", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer " + workerToken },
+        body: JSON.stringify(media ? { messageId: item.id, media } : { messageId: item.id, unavailable: true }),
+      }).catch(() => {});
+    }
+  } catch (error) {
+    console.error("Media queue failed:", error.message);
+  } finally { mediaBusy = false; }
 }
 
 async function pullOutbox() {
@@ -372,3 +381,4 @@ app.listen(3333, "0.0.0.0", () => {
 
 setInterval(() => refreshState().catch(error => console.error("Evolution state refresh failed:", error.message)), 10000).unref();
 setInterval(() => pullOutbox().catch(error => console.error("Outbox pull failed:", error.message)), 3000).unref();
+setInterval(() => pullMediaQueue().catch(error => console.error("Media pull failed:", error.message)), 3000).unref();

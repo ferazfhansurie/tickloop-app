@@ -74,14 +74,15 @@ export async function POST(request) {
         const mediaId = await storeMedia(q, connection.workspace_id, message.media);
         // DO UPDATE (not DO NOTHING) so a later pass can attach media to messages
         // that were already imported as text-only placeholders.
-        await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at,media_id,media_kind,media_name,media_mime,media_size)
-          VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${message.id},${message.fromMe ? "outbound" : "inbound"},${message.body},to_timestamp(${Number(message.timestamp) || timestamp}),${mediaId},${message.media?.kind || null},${message.media?.name || null},${message.media?.mime || null},${message.media?.size || null})
+        await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at,media_id,media_kind,media_name,media_mime,media_size,wa_key)
+          VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${message.id},${message.fromMe ? "outbound" : "inbound"},${message.body},to_timestamp(${Number(message.timestamp) || timestamp}),${mediaId},${message.media?.kind || message.mediaKind || null},${message.media?.name || null},${message.media?.mime || null},${message.media?.size || null},${message.waKey ? JSON.stringify(message.waKey) : null}::jsonb)
           ON CONFLICT (external_id) DO UPDATE SET
             media_id=COALESCE(tl_messages.media_id,EXCLUDED.media_id),
             media_kind=COALESCE(tl_messages.media_kind,EXCLUDED.media_kind),
             media_name=COALESCE(tl_messages.media_name,EXCLUDED.media_name),
             media_mime=COALESCE(tl_messages.media_mime,EXCLUDED.media_mime),
-            media_size=COALESCE(tl_messages.media_size,EXCLUDED.media_size)`;
+            media_size=COALESCE(tl_messages.media_size,EXCLUDED.media_size),
+            wa_key=COALESCE(tl_messages.wa_key,EXCLUDED.wa_key)`;
       }
       return NextResponse.json({ ok: true });
     }

@@ -21,7 +21,7 @@ export async function GET(request) {
     const [counted] = await q`SELECT count(*)::int AS total FROM tl_messages WHERE conversation_id=${conversationId}`;
     const total = counted?.total || 0;
     // Take the newest slice, then flip to chronological order for rendering.
-    const rows = await q`SELECT id,direction,body,sent_at,media_id,media_kind,media_name,media_mime,media_size FROM tl_messages WHERE conversation_id=${conversationId} ORDER BY sent_at DESC, id DESC LIMIT ${LIMIT}`;
+    const rows = await q`SELECT id,direction,body,sent_at,media_id,media_kind,media_name,media_mime,media_size,media_state FROM tl_messages WHERE conversation_id=${conversationId} ORDER BY sent_at DESC, id DESC LIMIT ${LIMIT}`;
     return NextResponse.json({ messages: rows.reverse(), total, limit: LIMIT, limited: total > LIMIT });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Could not load messages." }, { status: 500 });
