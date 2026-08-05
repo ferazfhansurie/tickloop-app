@@ -38,6 +38,15 @@ let historyCount = 0;
 const historyChats = new Set();
 const seen = new Set();
 
+// Evolution keeps the full WhatsApp history in its own store, but the
+// messages.set webhook only ever hands us a small recent slice per chat (~15).
+// So once the instance is live we pull the rest over Evolution's REST API.
+const HISTORY_CHAT_LIMIT = Number(process.env.TICKLOOP_HISTORY_CHATS || 250);
+const HISTORY_MESSAGE_LIMIT = Number(process.env.TICKLOOP_HISTORY_MESSAGES || 500);
+const HISTORY_CHUNK = 150; // messages per report call — keeps each insert batch quick
+let backfillRunning = false;
+let backfillDone = false;
+
 async function evolution(endpoint, options = {}) {
   const response = await fetch(evolutionUrl + endpoint, {
     ...options,
@@ -121,6 +130,71 @@ async function forwardMessage(item, history = false) {
   }
 }
 
+// Pull each chat's stored history out of Evolution and push it into TickLoop.
+// Runs once per process after the instance reports "open".
+async function backfillHistory() {
+  if (backfillRunning || backfillDone || !ready) return;
+  backfillRunning = true;
+  let imported = 0;
+  let available = 0;
+  try {
+    const chats = await evolution(`/chat/findChats/${instanceName}`, { method: "POST", body: "{}" });
+    const list = (Array.isArray(chats) ? chats : chats?.records || chats?.chats || [])
+      .filter(chat => {
+        const jid = String(chat.remoteJid || chat.id || "");
+        return jid && !jid.endsWith("@g.us") && !jid.includes("status@broadcast");
+      })
+      .slice(0, HISTORY_CHAT_LIMIT);
+    await report({ type: "sync_status", status: "syncing", imported: 0, total: 0 });
+
+    for (const chat of list) {
+      const jid = String(chat.remoteJid || chat.id);
+      const payload = await evolution(`/chat/findMessages/${instanceName}`, {
+        method: "POST",
+        body: JSON.stringify({ where: { key: { remoteJid: jid } }, page: 1, offset: HISTORY_MESSAGE_LIMIT }),
+      }).catch(() => null);
+      const records = payload?.messages?.records || payload?.records || (Array.isArray(payload) ? payload : []);
+      available += Number(payload?.messages?.total) || records.length;
+
+      const messages = records
+        .map(normaliseMessage)
+        .filter(item => item && item.body)
+        .map(item => ({ id: item.messageId, body: item.body, timestamp: item.timestamp, fromMe: item.fromMe }));
+      if (!messages.length) continue;
+      messages.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Chunked so a 2,000-message thread doesn't become one giant insert loop.
+      for (let index = 0; index < messages.length; index += HISTORY_CHUNK) {
+        const slice = messages.slice(index, index + HISTORY_CHUNK);
+        await report({
+          type: "sync",
+          chat: {
+            chatId: jid,
+            name: chat.pushName || "WhatsApp contact",
+            phone: jid.replace(/@.+$/, ""),
+            avatarUrl: chat.profilePicUrl || null,
+            timestamp: slice[slice.length - 1].timestamp,
+            messages: slice,
+          },
+        });
+        imported += slice.length;
+      }
+      historyChats.add(jid);
+      historyCount = imported;
+      await report({ type: "sync_status", status: "syncing", imported, total: available }).catch(() => {});
+    }
+
+    backfillDone = true;
+    await report({ type: "sync_status", status: "complete", imported, total: available });
+    console.log(`History backfill complete: ${imported} messages from ${list.length} chats.`);
+  } catch (error) {
+    console.error("History backfill failed:", error.message);
+    await report({ type: "sync_status", status: "retrying", imported, total: available, error: error.message }).catch(() => {});
+  } finally {
+    backfillRunning = false;
+  }
+}
+
 async function reportQr(payload) {
   const qr = qrFrom(payload);
   if (qr && qr !== lastQr) {
@@ -147,7 +221,8 @@ async function refreshState() {
   if (String(connection).toLowerCase() === "open") {
     if (!ready) await report({ type: "status", status: "ready", phone: state?.instance?.ownerJid || state?.instance?.wuid || null });
     ready = true;
-    await report({ type: "sync_status", status: "syncing", imported: historyCount, total: 100 });
+    // The backfill owns sync_status once it starts; don't clobber its progress.
+    if (!backfillDone && !backfillRunning) backfillHistory().catch(error => console.error("Backfill error:", error.message));
     return;
   }
   ready = false;

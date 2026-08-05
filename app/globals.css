@@ -21,3 +21,29 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 @media(max-width:700px){
   .emptyApp{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
 }
+
+/* --- Conversation thread (WhatsApp-style) --------------------------------
+   Full message history for the selected conversation: day dividers, bubbles
+   aligned by direction, and a "Sync limit reached" notice when the stored
+   thread is longer than the window the API returns. */
+.inboxEmpty.hasThread{padding:0;align-content:stretch;justify-items:stretch}
+.thread{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%;min-height:0;width:100%;background:#efe7de}
+.threadHeader{display:flex;align-items:center;gap:12px;padding:13px 20px;background:#fff;border-bottom:1px solid var(--line)}
+.threadWho{min-width:0}
+.threadWho b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.threadWho small{display:block;margin-top:2px;color:var(--muted);font-size:12px}
+.threadChannel{margin-left:auto;flex:none;font-size:10px;font-weight:850;letter-spacing:.09em;text-transform:uppercase;color:#277747;background:#e6f6ea;border-radius:99px;padding:5px 9px}
+.threadScroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:18px 22px 24px;display:flex;flex-direction:column;gap:3px}
+.dayGroup{display:flex;flex-direction:column;gap:3px}
+.dayDivider{display:flex;justify-content:center;margin:14px 0 10px}
+.dayDivider span{background:#fff;color:#5b6b61;font-size:11px;font-weight:750;border-radius:8px;padding:5px 11px;box-shadow:0 1px 2px #0000000f}
+.bubble{max-width:min(560px,78%);border-radius:9px;padding:7px 10px 5px;box-shadow:0 1px 1px #00000014;display:flex;align-items:flex-end;gap:9px}
+.bubble.in{align-self:flex-start;background:#fff;border-top-left-radius:2px}
+.bubble.out{align-self:flex-end;background:#d9fdd3;border-top-right-radius:2px}
+.bubbleText{font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}
+.bubble time{flex:none;font-size:10px;color:#667781;padding-bottom:2px}
+.syncLimit{align-self:center;max-width:92%;margin:0 0 12px;padding:9px 13px;border-radius:10px;background:#fff5d8;border:1px solid #f0e0b0;color:#7d5c0d;text-align:center}
+.syncLimit b{display:block;font-size:12px}
+.syncLimit span{display:block;margin-top:2px;font-size:11px;line-height:1.4;color:#8a6f2c}
+.threadHint{align-self:center;margin:auto 0;color:#63756a;font-size:12px}
+@media(max-width:700px){.thread{background:#efe7de}.threadScroll{padding:14px}.bubble{max-width:86%}}
