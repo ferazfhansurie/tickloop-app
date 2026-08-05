@@ -71,7 +71,7 @@ const app = express();
 app.get("/", (_request, response) => response.type("html").send("<!doctype html><html><body><h1>TickLoop WhatsApp</h1><p>" + state + "</p>" + (qrImage ? "<img src='" + qrImage + "' alt='WhatsApp QR code'>" : "") + "</body></html>"));
 app.listen(3333, "127.0.0.1", () => console.log("TickLoop OpenWA worker running on 127.0.0.1:3333."));
 
-create({ sessionId: "tickloop-openwa", sessionDataPath: path.join(__dirname, ".openwa-sessions"), headless: true, executablePath: fs.existsSync(chromePath) ? chromePath : undefined, qrTimeout: 0, authTimeout: 0, waitForRipeSessionTimeout: 0, qrLogSkip: true, disableSpins: true, cacheEnabled: false })
+create({ sessionId: "tickloop-openwa", sessionDataPath: path.join(__dirname, ".openwa-sessions"), headless: true, useChrome: true, executablePath: fs.existsSync(chromePath) ? chromePath : undefined, qrTimeout: 0, authTimeout: 0, waitForRipeSessionTimeout: 0, qrLogSkip: true, disableSpins: true, cacheEnabled: false })
   .then(async openWaClient => {
     client = openWaClient; connectedPhone = await client.getHostNumber().catch(() => null);
     state = "Connected to TickLoop."; await report({ type: "status", status: "ready", phone: connectedPhone });
