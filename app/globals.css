@@ -126,3 +126,5 @@ body:has(.emptyApp){overflow:hidden;height:100%}
   .inboxEmpty.hasThread{padding:0}
   .thread{border-radius:0}
 }
+/* A live connection reads as status, not as a call to action. */
+.connectButton.isConnected{background:#e9f8ee;border-color:#bfe3ca;color:#1f6c3d;cursor:default}
