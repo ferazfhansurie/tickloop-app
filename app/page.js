@@ -28,6 +28,43 @@ function clockTime(value) {
   return new Date(value).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
+function fileSize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+async function fileToBase64(file) {
+  const buffer = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(binary);
+}
+
+// One attachment inside a bubble. Images/video/audio play inline; anything else
+// (and any attachment whose bytes we could not capture) falls back to a file card.
+function Attachment({ message }) {
+  const src = message.media_id ? `/api/media/${message.media_id}` : null;
+  const kind = message.media_kind;
+  if (src && (kind === "image" || kind === "sticker")) {
+    return <a href={src} target="_blank" rel="noreferrer" className="mediaImageLink"><img className="mediaImage" src={src} alt={message.media_name || "Photo"} /></a>;
+  }
+  if (src && kind === "video") return <video className="mediaVideo" src={src} controls preload="metadata" />;
+  if (src && kind === "audio") return <audio className="mediaAudio" src={src} controls preload="metadata" />;
+  return (
+    <a className={`mediaFile${src ? "" : " pending"}`} href={src || undefined} target="_blank" rel="noreferrer" download={message.media_name || undefined}>
+      <span className="mediaIcon">{kind === "video" ? "▶" : kind === "audio" ? "♪" : "📄"}</span>
+      <span className="mediaMeta">
+        <b>{message.media_name || (kind ? `${kind} attachment` : "Attachment")}</b>
+        <small>{src ? fileSize(message.media_size) || "Download" : "Not synced"}</small>
+      </span>
+    </a>
+  );
+}
+
 function BrandMark({ className = "" }) {
   return <img className={`brandMark ${className}`.trim()} src="/tickloop-mark.png" alt="TickLoop" />;
 }
@@ -59,6 +96,55 @@ export default function Page() {
   async function loadConversations() {
     const response = await fetch("/api/conversations");
     if (response.ok) setConversations((await response.json()).conversations || []);
+  }
+
+  const [draft, setDraft] = useState("");
+  const [pendingFile, setPendingFile] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [forwarding, setForwarding] = useState(null); // message being forwarded
+  const fileInputRef = useRef(null);
+
+  // Queue a reply (text and/or one attachment) on the open conversation.
+  async function sendMessage(event) {
+    event?.preventDefault();
+    if (sending) return;
+    const text = draft.trim();
+    if (!text && !pendingFile) return;
+    setSending(true);
+    try {
+      const media = pendingFile
+        ? { base64: await fileToBase64(pendingFile), mime: pendingFile.type || "application/octet-stream", name: pendingFile.name }
+        : null;
+      const response = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ conversationId: effectiveConversationId, body: text, media }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { setNotice(data.error || "Could not send."); return; }
+      setDraft(""); setPendingFile(null);
+      stickToBottom.current = true;
+      // The adapter sends it and reports back; poll a little sooner than the timer.
+      window.setTimeout(() => loadThread(effectiveConversationId, { quiet: true }), 1200);
+    } catch (error) {
+      setNotice(error.message || "Could not send.");
+    } finally { setSending(false); }
+  }
+
+  // Forward an existing message (with its attachment, if we captured one) to
+  // another conversation, without re-uploading anything.
+  async function forwardTo(conversationId) {
+    if (!forwarding) return;
+    setSending(true);
+    try {
+      const response = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ conversationId, body: forwarding.body || "", mediaId: forwarding.media_id || null }),
+      });
+      const data = await response.json().catch(() => ({}));
+      setNotice(response.ok ? "Forwarded." : (data.error || "Could not forward."));
+    } finally { setSending(false); setForwarding(null); }
   }
 
   async function loadThread(conversationId, { quiet = false } = {}) {
@@ -164,9 +250,10 @@ export default function Page() {
     <aside className="simpleRail"><BrandMark /><div className="railGrow"/><button className="accountButton" onClick={logout} title="Sign out">{user.name?.[0]?.toUpperCase()}</button></aside>
     <header className="mobileHeader"><div><BrandMark className="mobileMark" /><b>TickLoop</b></div><button onClick={logout}>Sign out</button></header>
     <aside className="inboxColumn"><header><h1>Inbox</h1><p>{conversations.length ? `${conversations.length} conversation${conversations.length === 1 ? "" : "s"}` : "All conversations"}</p></header><div className="conversationList">{conversations.length ? conversations.map(item => <button key={item.id} className={`conversationItem ${active?.id === item.id ? "selected" : ""}`} onClick={() => setActiveConversation(item.id)}><ConversationAvatar conversation={item} /><span><b>{item.customer_name || "Customer"}</b><small>{item.provider === "whatsapp" ? "WhatsApp" : "TikTok Shop"} · {item.last_message || "New order"}</small></span></button>) : <div className="emptyList"><strong>No conversations yet</strong><span>New WhatsApp messages and TikTok order events appear here automatically.</span></div>}</div></aside>
-    <section className={`inboxEmpty${active ? " hasThread" : ""}`}>{active ? <div className="thread"><header className="threadHeader"><ConversationAvatar conversation={active} /><div className="threadWho"><b>{active.customer_name || "Customer"}</b><small>{active.customer_phone || "Contact protected"}</small></div><span className="threadChannel">{active.provider === "whatsapp" ? "WhatsApp" : "TikTok Shop"}</span></header><div className="threadScroll" ref={threadScrollRef} onScroll={event => { const el = event.currentTarget; stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>{thread.limited && <p className="syncLimit"><b>Sync limit reached</b><span>Showing the latest {thread.limit} of {thread.total} messages. WhatsApp does not expose older history.</span></p>}{thread.loading && !thread.messages.length ? <p className="threadHint">Loading messages…</p> : null}{!thread.loading && !thread.messages.length ? <p className="threadHint">No messages synced for this conversation yet.</p> : null}{groupByDay(thread.messages).map(group => <div className="dayGroup" key={`${group.label}-${group.items[0].id}`}><div className="dayDivider"><span>{group.label}</span></div>{group.items.map(message => <div key={message.id} className={`bubble ${message.direction === "outbound" ? "out" : "in"}`}><span className="bubbleText">{message.body}</span><time>{clockTime(message.sent_at)}</time></div>)}</div>)}</div></div> :<div className="readyCard"><div className="readyMark">✓</div><p className="eyebrow">YOUR INBOX IS READY</p><h2>Start by connecting your channels.</h2><p>When TikTok Shop orders and WhatsApp messages arrive, they will appear here as real customer conversations.</p><div className="setupLine"><span className={tiktok?.status === "connected" ? "complete" : ""}>{tiktok?.status === "connected" ? "✓" : "1"}</span><b>Connect TikTok Shop</b><small>{tiktok?.status === "connected" ? "Connected" : "Order context"}</small></div><div className="setupLine"><span className={whatsapp?.status === "connected" ? "complete" : ""}>{whatsapp?.status === "connected" ? "✓" : "2"}</span><b>Connect WhatsApp</b><small>{whatsapp?.status === "connected" ? "Connected" : "Customer messages"}</small></div><button className="testOrderButton" onClick={createTestOrder} disabled={creatingTestOrder}>{creatingTestOrder ? "Creating test order…" : "Create a test TikTok order"}</button><p className="testNote">Tests stay inside TickLoop. No WhatsApp message is sent.</p></div>}</section>
+    <section className={`inboxEmpty${active ? " hasThread" : ""}`}>{active ? <div className="thread"><header className="threadHeader"><ConversationAvatar conversation={active} /><div className="threadWho"><b>{active.customer_name || "Customer"}</b><small>{active.customer_phone || "Contact protected"}</small></div><span className="threadChannel">{active.provider === "whatsapp" ? "WhatsApp" : "TikTok Shop"}</span></header><div className="threadScroll" ref={threadScrollRef} onScroll={event => { const el = event.currentTarget; stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}>{thread.limited && <p className="syncLimit"><b>Sync limit reached</b><span>Showing the latest {thread.limit} of {thread.total} messages. WhatsApp does not expose older history.</span></p>}{thread.loading && !thread.messages.length ? <p className="threadHint">Loading messages…</p> : null}{!thread.loading && !thread.messages.length ? <p className="threadHint">No messages synced for this conversation yet.</p> : null}{groupByDay(thread.messages).map(group => <div className="dayGroup" key={`${group.label}-${group.items[0].id}`}><div className="dayDivider"><span>{group.label}</span></div>{group.items.map(message => <div key={message.id} className={`bubbleRow ${message.direction === "outbound" ? "out" : "in"}`}><div className={`bubble ${message.direction === "outbound" ? "out" : "in"}${message.media_kind ? " hasMedia" : ""}`}>{message.media_kind && <Attachment message={message} />}{message.body ? <span className="bubbleText">{message.body}</span> : null}<time>{clockTime(message.sent_at)}</time></div><button type="button" className="forwardBtn" title="Forward" onClick={() => setForwarding(message)}>↪</button></div>)}</div>)}</div><form className="composer" onSubmit={sendMessage}>{pendingFile && <div className="pendingFile"><span>📎 {pendingFile.name} <small>{fileSize(pendingFile.size)}</small></span><button type="button" onClick={() => setPendingFile(null)}>✕</button></div>}<div className="composerRow"><button type="button" className="attachBtn" title="Attach" onClick={() => fileInputRef.current?.click()}>＋</button><input ref={fileInputRef} type="file" hidden accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" onChange={event => { const file = event.target.files?.[0]; if (file) setPendingFile(file); event.target.value = ""; }} /><textarea className="composerInput" rows={1} placeholder="Type a message" value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); } }} /><button className="sendBtn" disabled={sending || (!draft.trim() && !pendingFile)} title="Send">{sending ? "…" : "➤"}</button></div></form></div> :<div className="readyCard"><div className="readyMark">✓</div><p className="eyebrow">YOUR INBOX IS READY</p><h2>Start by connecting your channels.</h2><p>When TikTok Shop orders and WhatsApp messages arrive, they will appear here as real customer conversations.</p><div className="setupLine"><span className={tiktok?.status === "connected" ? "complete" : ""}>{tiktok?.status === "connected" ? "✓" : "1"}</span><b>Connect TikTok Shop</b><small>{tiktok?.status === "connected" ? "Connected" : "Order context"}</small></div><div className="setupLine"><span className={whatsapp?.status === "connected" ? "complete" : ""}>{whatsapp?.status === "connected" ? "✓" : "2"}</span><b>Connect WhatsApp</b><small>{whatsapp?.status === "connected" ? "Connected" : "Customer messages"}</small></div><button className="testOrderButton" onClick={createTestOrder} disabled={creatingTestOrder}>{creatingTestOrder ? "Creating test order…" : "Create a test TikTok order"}</button><p className="testNote">Tests stay inside TickLoop. No WhatsApp message is sent.</p></div>}</section>
     <aside className="setupPanel"><h2>Workspace setup</h2><p className="setupIntro">Connect your channels before your inbox starts receiving customers.</p><section className="connectionCard"><div><b>TikTok Shop</b><p>{tiktok?.status === "connected" ? "Your seller account is connected." : "Add order context to every conversation."}</p></div><button className="connectButton" onClick={() => connect("tiktok_shop")}>{tiktok?.status === "connected" ? "Connected" : "Connect TikTok Shop"}</button></section><section className="connectionCard"><div><b>WhatsApp</b><p>{whatsapp?.status === "connected" ? "Your WhatsApp number is connected." : "Bring new customer messages into TickLoop."}</p></div><button className="connectButton" onClick={() => connect("whatsapp")}>{whatsapp?.status === "connected" ? "Connected" : "Connect WhatsApp"}</button></section><section className="connectionCard automationCard"><div><b>Post-purchase testing</b><p>Create a dummy paid order and confirm that order context reaches the inbox.</p></div><button className="connectButton" onClick={createTestOrder} disabled={creatingTestOrder}>{creatingTestOrder ? "Creating…" : "Create test order"}</button></section><section className="connectionCard testSendCard"><b>Send a direct test</b><p>Use a number you control or have permission to message.</p><form onSubmit={sendTestMessage}><input required value={testSend.phone} onChange={event => setTestSend({ ...testSend, phone: event.target.value })} placeholder="+60 12 345 6789" /><textarea required value={testSend.message} onChange={event => setTestSend({ ...testSend, message: event.target.value })} /><label className="consentCheck"><input type="checkbox" checked={testSend.confirmed} onChange={event => setTestSend({ ...testSend, confirmed: event.target.checked })} /> I have permission to message this number.</label><button className="connectButton" disabled={sendingTest}>{sendingTest ? "Sending…" : "Send test message"}</button></form></section><div className="workspaceBlock"><small>WORKSPACE</small><b>{workspace?.user?.workspace_name || "Your TickLoop workspace"}</b><span>{user.email}</span>{user.role === "admin" && <a className="adminLink" href="/admin">Open admin dashboard</a>}</div>{setupReady && <p className="allReady">✓ Both channels are connected.</p>}</aside>
     {whatsapp?.status === "connected" && <div className={`syncStatus ${sync.syncStatus || "waiting"}`}><span>{sync.syncStatus === "complete" ? "✓" : "↻"}</span><div><b>{sync.syncStatus === "complete" ? "WhatsApp history synced" : sync.syncStatus === "retrying" ? "Retrying WhatsApp history" : sync.syncStatus === "syncing" ? "Syncing WhatsApp history" : "Live WhatsApp sync active"}</b><small>{sync.syncTotal ? `${sync.syncImported || 0} of ${sync.syncTotal} messages imported` : sync.lastSyncError || "New messages appear here automatically."}</small></div></div>}
+    {forwarding && <div className="forwardOverlay" onClick={() => setForwarding(null)}><div className="forwardCard" onClick={event => event.stopPropagation()}><header><b>Forward to…</b><button type="button" onClick={() => setForwarding(null)}>✕</button></header><p className="forwardPreview">{forwarding.media_kind ? `📎 ${forwarding.media_name || forwarding.media_kind} ` : ""}{forwarding.body?.slice(0, 120) || ""}</p><div className="forwardList">{conversations.filter(item => item.id !== effectiveConversationId && item.provider === "whatsapp").map(item => <button key={item.id} type="button" disabled={sending} onClick={() => forwardTo(item.id)}><ConversationAvatar conversation={item} /><span>{item.customer_name || item.customer_phone || "Customer"}</span></button>)}</div></div></div>}
     {notice && <button className="notice" onClick={() => setNotice("")}>{notice}</button>}
   </main>;
 }

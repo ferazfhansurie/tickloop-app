@@ -56,7 +56,10 @@ export async function POST(request) {
       if (!body.messageId || !body.chatId || typeof body.body !== "string") return NextResponse.json({ error: "Invalid message payload." }, { status: 400 });
       const conversationId = `cv_${createHash("sha256").update(`${connection.workspace_id}:${body.chatId}`).digest("hex").slice(0, 24)}`;
       await q`INSERT INTO tl_conversations (id,workspace_id,provider,external_id,customer_name,customer_phone,last_message_at) VALUES (${conversationId},${connection.workspace_id},'whatsapp',${body.chatId},${body.pushName || null},${body.phone || null},to_timestamp(${body.timestamp || Math.floor(Date.now() / 1000)})) ON CONFLICT (workspace_id,provider,external_id) DO UPDATE SET customer_name=COALESCE(EXCLUDED.customer_name,tl_conversations.customer_name),customer_phone=COALESCE(EXCLUDED.customer_phone,tl_conversations.customer_phone),last_message_at=EXCLUDED.last_message_at`;
-      await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at) VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${body.messageId},'inbound',${body.body},to_timestamp(${body.timestamp || Math.floor(Date.now() / 1000)})) ON CONFLICT (external_id) DO NOTHING`;
+      const liveMediaId = await storeMedia(q, connection.workspace_id, body.media);
+      await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at,media_id,media_kind,media_name,media_mime,media_size)
+        VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${body.messageId},'inbound',${body.body},to_timestamp(${body.timestamp || Math.floor(Date.now() / 1000)}),${liveMediaId},${body.media?.kind || null},${body.media?.name || null},${body.media?.mime || null},${body.media?.size || null})
+        ON CONFLICT (external_id) DO UPDATE SET media_id=COALESCE(tl_messages.media_id,EXCLUDED.media_id),media_kind=COALESCE(tl_messages.media_kind,EXCLUDED.media_kind)`;
       return NextResponse.json({ ok: true });
     }
     if (body.type === "sync") {
@@ -68,7 +71,17 @@ export async function POST(request) {
       // dropped two thirds of every backfill batch.
       for (const message of chat.messages) {
         if (!message.id || typeof message.body !== "string") continue;
-        await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at) VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${message.id},${message.fromMe ? "outbound" : "inbound"},${message.body},to_timestamp(${Number(message.timestamp) || timestamp})) ON CONFLICT (external_id) DO NOTHING`;
+        const mediaId = await storeMedia(q, connection.workspace_id, message.media);
+        // DO UPDATE (not DO NOTHING) so a later pass can attach media to messages
+        // that were already imported as text-only placeholders.
+        await q`INSERT INTO tl_messages (id,conversation_id,external_id,direction,body,sent_at,media_id,media_kind,media_name,media_mime,media_size)
+          VALUES (${`msg_${randomBytes(12).toString("hex")}`},${conversationId},${message.id},${message.fromMe ? "outbound" : "inbound"},${message.body},to_timestamp(${Number(message.timestamp) || timestamp}),${mediaId},${message.media?.kind || null},${message.media?.name || null},${message.media?.mime || null},${message.media?.size || null})
+          ON CONFLICT (external_id) DO UPDATE SET
+            media_id=COALESCE(tl_messages.media_id,EXCLUDED.media_id),
+            media_kind=COALESCE(tl_messages.media_kind,EXCLUDED.media_kind),
+            media_name=COALESCE(tl_messages.media_name,EXCLUDED.media_name),
+            media_mime=COALESCE(tl_messages.media_mime,EXCLUDED.media_mime),
+            media_size=COALESCE(tl_messages.media_size,EXCLUDED.media_size)`;
       }
       return NextResponse.json({ ok: true });
     }
@@ -126,4 +139,20 @@ async function mergeDuplicateConversations(q, workspaceId) {
       WHERE id=${keeper.id}`;
   }
   return merged;
+}
+
+// Persist an attachment's bytes and hand back its id. Media arrives base64 from
+// the adapter (Evolution decrypts it locally); anything oversized is skipped so a
+// single 40MB video can't blow up the row limit — the message still renders as a
+// card with its filename and size.
+const MEDIA_MAX_BYTES = 8 * 1024 * 1024;
+async function storeMedia(q, workspaceId, media) {
+  if (!media || typeof media.base64 !== "string" || !media.base64) return null;
+  let bytes;
+  try { bytes = Buffer.from(media.base64, "base64"); } catch { return null; }
+  if (!bytes.length || bytes.length > MEDIA_MAX_BYTES) return null;
+  const id = `md_${randomBytes(12).toString("hex")}`;
+  await q`INSERT INTO tl_media (id,workspace_id,mime_type,file_name,size_bytes,data)
+    VALUES (${id},${workspaceId},${media.mime || "application/octet-stream"},${media.name || null},${bytes.length},${bytes})`;
+  return id;
 }

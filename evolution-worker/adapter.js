@@ -44,6 +44,10 @@ const seen = new Set();
 const HISTORY_CHAT_LIMIT = Number(process.env.TICKLOOP_HISTORY_CHATS || 250);
 const HISTORY_MESSAGE_LIMIT = Number(process.env.TICKLOOP_HISTORY_MESSAGES || 500);
 const HISTORY_CHUNK = 150; // messages per report call — keeps each insert batch quick
+// Attachments are shipped one per call (base64 is bulky), so cap how many we
+// capture per chat during the historical sweep. Live media is always captured.
+const MEDIA_PER_CHAT = Number(process.env.TICKLOOP_HISTORY_MEDIA || 40);
+const MEDIA_MAX_BYTES = 8 * 1024 * 1024;
 let backfillRunning = false;
 let backfillDone = false;
 
@@ -98,6 +102,36 @@ function textFrom(message = {}) {
   return "";
 }
 
+// Which attachment kind (if any) a raw Evolution record represents.
+function mediaKindOf(entry) {
+  const message = entry?.message || entry?.data?.message || {};
+  const type = String(entry?.messageType || "");
+  if (type === "imageMessage" || message.imageMessage) return "image";
+  if (type === "videoMessage" || message.videoMessage) return "video";
+  if (type === "audioMessage" || message.audioMessage) return "audio";
+  if (type === "stickerMessage" || message.stickerMessage) return "sticker";
+  if (type === "documentMessage" || message.documentMessage || message.documentWithCaptionMessage) return "document";
+  return null;
+}
+
+// Evolution decrypts WhatsApp media locally and hands it back as base64. Only the
+// laptop can do this (the media keys live in the Baileys session), which is why
+// capture happens here and the bytes are shipped to TickLoop rather than linked.
+async function fetchMedia(key, kind) {
+  try {
+    const result = await evolution(`/chat/getBase64FromMediaMessage/${instanceName}`, {
+      method: "POST",
+      body: JSON.stringify({ message: { key } }),
+    });
+    if (!result?.base64) return null;
+    const size = Number(result.size?.fileLength || result.size) || Math.round((result.base64.length * 3) / 4);
+    if (size > MEDIA_MAX_BYTES) return null;
+    return { base64: result.base64, mime: result.mimetype || "application/octet-stream", name: result.fileName || null, size, kind };
+  } catch {
+    return null;
+  }
+}
+
 function normaliseMessage(entry) {
   const key = entry?.key || entry?.message?.key || {};
   const message = entry?.message || entry?.data?.message || {};
@@ -116,6 +150,7 @@ function normaliseMessage(entry) {
     phone: String(chatId).endsWith("@lid") ? null : String(chatId).replace(/@.+$/, ""),
     fromMe: Boolean(key.fromMe || entry?.fromMe),
     avatarUrl: entry?.profilePicUrl || entry?.profilePictureUrl || null,
+    raw: entry,
   };
 }
 
@@ -129,7 +164,11 @@ async function forwardMessage(item, history = false) {
     await report({ type: "sync", chat: { chatId: item.chatId, name: item.pushName || "WhatsApp contact", phone: item.phone, avatarUrl: item.avatarUrl, timestamp: item.timestamp, messages: [{ id: item.messageId, body: item.body, timestamp: item.timestamp, fromMe: item.fromMe }] } });
     historyCount += 1;
   } else if (!item.fromMe) {
-    await report({ type: "message", messageId: item.messageId, chatId: item.chatId, body: item.body, timestamp: item.timestamp, pushName: item.pushName, phone: item.phone });
+    // Capture attachments on arrival so the inbox shows the actual photo/file
+    // rather than an "[Image]" placeholder.
+    const kind = mediaKindOf(item.raw);
+    const media = kind ? await fetchMedia(item.raw?.key || { id: item.messageId, remoteJid: item.chatId }, kind) : null;
+    await report({ type: "message", messageId: item.messageId, chatId: item.chatId, body: item.body, timestamp: item.timestamp, pushName: item.pushName, phone: item.phone, media });
   }
 }
 
@@ -182,6 +221,31 @@ async function backfillHistory() {
         });
         imported += slice.length;
       }
+      // Second pass: attach real attachments to the newest media messages. These
+      // go one per call because base64 payloads are large; the server upserts them
+      // onto the rows the text pass just created.
+      const mediaRecords = records
+        .filter(record => mediaKindOf(record))
+        .sort((a, b) => Number(b.messageTimestamp || 0) - Number(a.messageTimestamp || 0))
+        .slice(0, MEDIA_PER_CHAT);
+      for (const record of mediaRecords) {
+        const item = normaliseMessage(record);
+        if (!item) continue;
+        const media = await fetchMedia(record.key, mediaKindOf(record));
+        if (!media) continue;
+        await report({
+          type: "sync",
+          chat: {
+            chatId: jid,
+            name: chat.pushName || "WhatsApp contact",
+            phone: jid.endsWith("@lid") ? null : jid.replace(/@.+$/, ""),
+            avatarUrl: chat.profilePicUrl || null,
+            timestamp: item.timestamp,
+            messages: [{ id: item.messageId, body: item.body, timestamp: item.timestamp, fromMe: item.fromMe, media }],
+          },
+        }).catch(() => {});
+      }
+
       historyChats.add(jid);
       historyCount = imported;
       await report({ type: "sync_status", status: "syncing", imported, total: available }).catch(() => {});
@@ -249,7 +313,22 @@ async function pullOutbox() {
     const item = (await response.json()).item;
     if (!item) return;
     try {
-      const result = await evolution(`/message/sendText/${instanceName}`, { method: "POST", body: JSON.stringify({ number: item.phone, text: item.body }) });
+      // Prefer the full JID: @lid contacts have no dialable number at all.
+      const number = item.recipient || item.phone;
+      const result = item.media_base64
+        ? await evolution(`/message/sendMedia/${instanceName}`, {
+            method: "POST",
+            body: JSON.stringify({
+              number,
+              // Evolution's sendMedia takes image | video | audio | document.
+              mediatype: item.media_kind === "sticker" ? "image" : (item.media_kind || "document"),
+              mimetype: item.media_mime || "application/octet-stream",
+              media: item.media_base64,
+              fileName: item.media_name || "file",
+              caption: item.body || "",
+            }),
+          })
+        : await evolution(`/message/sendText/${instanceName}`, { method: "POST", body: JSON.stringify({ number, text: item.body }) });
       const externalId = result?.key?.id || result?.message?.key?.id || result?.id || null;
       await fetch(tickloopUrl + "/api/whatsapp/outbox", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + workerToken }, body: JSON.stringify({ id: item.id, status: "sent", externalId }) });
     } catch (error) {

@@ -47,3 +47,50 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .syncLimit span{display:block;margin-top:2px;font-size:11px;line-height:1.4;color:#8a6f2c}
 .threadHint{align-self:center;margin:auto 0;color:#63756a;font-size:12px}
 @media(max-width:700px){.thread{background:#efe7de}.threadScroll{padding:14px}.bubble{max-width:86%}}
+
+/* --- Attachments, composer, forward -------------------------------------- */
+.thread{grid-template-rows:auto minmax(0,1fr) auto}
+.bubbleRow{display:flex;align-items:center;gap:6px}
+.bubbleRow.in{align-self:flex-start;flex-direction:row}
+.bubbleRow.out{align-self:flex-end;flex-direction:row-reverse}
+.bubbleRow .bubble{align-self:auto;max-width:min(560px,100%)}
+.forwardBtn{flex:none;border:0;background:transparent;color:#7d8c83;font-size:15px;line-height:1;padding:4px 6px;border-radius:8px;cursor:pointer;opacity:0;transition:opacity .12s}
+.bubbleRow:hover .forwardBtn,.forwardBtn:focus-visible{opacity:1}
+.forwardBtn:hover{background:#0000000d;color:var(--ink)}
+.bubble.hasMedia{flex-direction:column;align-items:stretch;gap:5px;padding:5px 5px 5px}
+.bubble.hasMedia .bubbleText{padding:0 5px}
+.bubble.hasMedia time{align-self:flex-end;padding-right:5px}
+.mediaImageLink{display:block}
+.mediaImage{display:block;max-width:min(320px,60vw);max-height:340px;width:auto;border-radius:6px;object-fit:cover}
+.mediaVideo{display:block;max-width:min(320px,60vw);border-radius:6px;background:#000}
+.mediaAudio{width:min(300px,60vw)}
+.mediaFile{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;background:#00000008;text-decoration:none;color:inherit;min-width:min(240px,55vw)}
+.mediaFile:hover{background:#00000012}
+.mediaFile.pending{opacity:.65;pointer-events:none}
+.mediaIcon{flex:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:#fff;color:#4a5a51;font-size:14px}
+.mediaMeta{min-width:0}
+.mediaMeta b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mediaMeta small{display:block;margin-top:1px;color:#667781;font-size:11px}
+
+.composer{background:#f0f2f0;border-top:1px solid var(--line);padding:10px 14px}
+.pendingFile{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;padding:8px 11px;background:#fff;border:1px solid var(--line);border-radius:10px;font-size:12px}
+.pendingFile small{color:var(--muted);margin-left:6px}
+.pendingFile button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:13px}
+.composerRow{display:flex;align-items:flex-end;gap:8px}
+.attachBtn,.sendBtn{flex:none;width:40px;height:40px;border-radius:50%;border:0;cursor:pointer;font-size:17px;line-height:1}
+.attachBtn{background:#fff;border:1px solid var(--line);color:#4a5a51}
+.attachBtn:hover{background:#f6f8f6}
+.sendBtn{background:var(--green);color:#fff}
+.sendBtn:disabled{opacity:.45;cursor:not-allowed}
+.composerInput{flex:1;min-width:0;resize:none;max-height:120px;border:1px solid var(--line);border-radius:20px;padding:10px 15px;font-size:14px;line-height:1.4;outline-color:#80bf95;background:#fff;font-family:inherit}
+
+.forwardOverlay{position:fixed;inset:0;z-index:20;background:#0f150f66;display:grid;place-items:center;padding:20px}
+.forwardCard{width:min(380px,100%);max-height:70vh;display:flex;flex-direction:column;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px #0e1c1433}
+.forwardCard header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.forwardCard header button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:14px}
+.forwardPreview{margin:0;padding:10px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.forwardList{overflow-y:auto;padding:8px}
+.forwardList button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:9px 10px;border-radius:10px;cursor:pointer;text-align:left;font-size:13px;color:var(--ink)}
+.forwardList button:hover{background:#edf8ef}
+.forwardList button:disabled{opacity:.5}
+@media(max-width:700px){.mediaImage,.mediaVideo{max-width:70vw}}
