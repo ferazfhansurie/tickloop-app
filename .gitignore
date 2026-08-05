@@ -3,5 +3,12 @@
 .next
 node_modules
 whatsapp-worker/.sessions
+whatsapp-worker/.openwa-sessions
 whatsapp-worker/.tickloop-worker.json
 whatsapp-worker/.wwebjs_cache
+
+# managed by open-wa
+**.data.json
+**.node-persist**
+**_IGNORE_**
+# end managed by open-wa

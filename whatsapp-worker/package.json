@@ -2,11 +2,15 @@
   "name": "tickloop-whatsapp-worker",
   "private": true,
   "version": "0.1.0",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
+    "@open-wa/wa-automate": "4.76.0",
     "express": "^5.1.0",
-    "qrcode": "^1.5.4",
-    "whatsapp-web.js": "^1.34.7"
+    "qrcode": "^1.5.4"
   }
 }
