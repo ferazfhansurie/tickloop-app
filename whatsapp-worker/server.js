@@ -43,17 +43,19 @@ async function pullOutbox() {
 async function syncExistingChats() {
   try {
     const chats = (await client.getChats()).filter(chat => !chat.isGroup && !chat.id._serialized.includes("status@broadcast")).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 100);
+    let imported = 0; await report({ type: "sync_status", status: "syncing", imported, total: chats.length });
     for (const chat of chats) {
       try {
         const contact = await chat.getContact();
         const avatarUrl = await client.getProfilePicUrl(chat.id._serialized).catch(() => null);
         const messages = await chat.fetchMessages({ limit: 50 });
         await report({ type: "sync", chat: { chatId: chat.id._serialized, name: contact.pushname || contact.name || chat.name || contact.number || "WhatsApp contact", phone: contact.number || chat.id.user || null, avatarUrl, timestamp: chat.timestamp || Math.floor(Date.now() / 1000), messages: messages.map(message => ({ id: message.id._serialized, body: message.body || "", timestamp: message.timestamp, fromMe: message.fromMe })) } });
+        imported += 1; if (imported === chats.length || imported % 5 === 0) await report({ type: "sync_status", status: "syncing", imported, total: chats.length });
       } catch (error) { console.error("Could not sync a WhatsApp chat:", error.message); }
     }
-    syncAttempts = 0; state = "Connected to TickLoop.";
+    syncAttempts = 0; state = "Connected to TickLoop."; await report({ type: "sync_status", status: "complete", imported, total: chats.length });
   } catch (error) {
-    syncAttempts += 1; state = "Connected to TickLoop. Retrying chat import…";
+    syncAttempts += 1; state = "Connected to TickLoop. Retrying chat import…"; await report({ type: "sync_status", status: "retrying", error: error.message || "WhatsApp Web chat list is not ready." });
     if (syncAttempts <= 5) setTimeout(() => syncExistingChats().catch(console.error), 30000).unref();
     throw error;
   }

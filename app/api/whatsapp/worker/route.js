@@ -33,6 +33,12 @@ export async function POST(request) {
       await q`UPDATE tl_connections SET status=${status},external_id=${body.phone || null},metadata=CASE WHEN ${status}='connected' THEN metadata - 'qrDataUrl' ELSE metadata END,updated_at=now() WHERE id=${connection.id}`;
       return NextResponse.json({ ok: true, status });
     }
+    if (body.type === "sync_status") {
+      const metadata = { ...(connection.metadata || {}), syncStatus: body.status || "syncing", syncImported: Number(body.imported) || 0, syncTotal: Number(body.total) || 0, lastSyncAt: new Date().toISOString(), ...(body.error ? { lastSyncError: String(body.error).slice(0, 180) } : {}) };
+      if (body.status === "complete") delete metadata.lastSyncError;
+      await q`UPDATE tl_connections SET metadata=${JSON.stringify(metadata)}::jsonb,updated_at=now() WHERE id=${connection.id}`;
+      return NextResponse.json({ ok: true });
+    }
     if (body.type === "message") {
       if (!body.messageId || !body.chatId || typeof body.body !== "string") return NextResponse.json({ error: "Invalid message payload." }, { status: 400 });
       const conversationId = `cv_${createHash("sha256").update(`${connection.workspace_id}:${body.chatId}`).digest("hex").slice(0, 24)}`;
