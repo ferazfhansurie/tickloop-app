@@ -35,6 +35,7 @@ let ready = false;
 let instanceCreated = false;
 let outboxBusy = false;
 let historyCount = 0;
+const historyChats = new Set();
 const seen = new Set();
 
 async function evolution(endpoint, options = {}) {
@@ -102,6 +103,7 @@ function normaliseMessage(entry) {
     pushName: entry?.pushName || entry?.pushname || entry?.senderName || null,
     phone: String(chatId).replace(/@.+$/, ""),
     fromMe: Boolean(key.fromMe || entry?.fromMe),
+    avatarUrl: entry?.profilePicUrl || entry?.profilePictureUrl || null,
   };
 }
 
@@ -110,7 +112,9 @@ async function forwardMessage(item, history = false) {
   seen.add(item.messageId);
   if (seen.size > 3000) seen.delete(seen.values().next().value);
   if (history) {
-    await report({ type: "sync", chat: { chatId: item.chatId, name: item.pushName || "WhatsApp contact", phone: item.phone, timestamp: item.timestamp, messages: [{ id: item.messageId, body: item.body, timestamp: item.timestamp, fromMe: item.fromMe }] } });
+    if (!historyChats.has(item.chatId) && historyChats.size >= 100) return;
+    historyChats.add(item.chatId);
+    await report({ type: "sync", chat: { chatId: item.chatId, name: item.pushName || "WhatsApp contact", phone: item.phone, avatarUrl: item.avatarUrl, timestamp: item.timestamp, messages: [{ id: item.messageId, body: item.body, timestamp: item.timestamp, fromMe: item.fromMe }] } });
     historyCount += 1;
   } else if (!item.fromMe) {
     await report({ type: "message", messageId: item.messageId, chatId: item.chatId, body: item.body, timestamp: item.timestamp, pushName: item.pushName, phone: item.phone });
@@ -133,6 +137,7 @@ async function ensureInstance() {
     instanceCreated = true;
     await reportQr(created);
   } else instanceCreated = true;
+  await evolution(`/settings/set/${instanceName}`, { method: "POST", body: JSON.stringify({ rejectCall: false, msgCall: "", groupsIgnore: false, alwaysOnline: false, readMessages: false, readStatus: false, syncFullHistory: true }) });
 }
 
 async function refreshState() {
