@@ -338,7 +338,9 @@ async function pullOutbox() {
 }
 
 const app = express();
-app.use(express.json({ limit: "2mb" }));
+// Evolution posts media webhooks with the attachment inlined, so 2mb rejected
+// every photo/video event with PayloadTooLargeError.
+app.use(express.json({ limit: "64mb" }));
 app.get("/", (_request, response) => response.json({ service: "TickLoop Evolution adapter", instanceName, ready, instanceCreated }));
 app.post("/evolution/webhook", (request, response) => {
   if (request.query.key !== webhookKey) return response.status(401).json({ error: "Invalid webhook key." });
