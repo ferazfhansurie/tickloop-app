@@ -6,6 +6,8 @@ whatsapp-worker/.sessions
 whatsapp-worker/.openwa-sessions
 whatsapp-worker/.tickloop-worker.json
 whatsapp-worker/.wwebjs_cache
+evolution-worker/.env
+evolution-worker/.tickloop-evolution.json
 
 # managed by open-wa
 **.data.json

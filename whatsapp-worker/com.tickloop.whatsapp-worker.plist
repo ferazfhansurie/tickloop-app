@@ -7,10 +7,10 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/node</string>
-    <string>/tmp/tickloop-onboarding-web/whatsapp-worker/server.js</string>
+    <string>/tmp/tickloop-onboarding-web/evolution-worker/adapter.js</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/tmp/tickloop-onboarding-web/whatsapp-worker</string>
+  <string>/tmp/tickloop-onboarding-web/evolution-worker</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
