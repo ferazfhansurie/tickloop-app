@@ -1,5 +1,6 @@
 .vercel
 .env*
+!evolution-worker/.env.example
 .next
 node_modules
 whatsapp-worker/.sessions
