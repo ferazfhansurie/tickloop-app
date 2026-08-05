@@ -34,7 +34,9 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, status });
     }
     if (body.type === "sync_status") {
-      const metadata = { ...(connection.metadata || {}), syncStatus: body.status || "syncing", syncImported: Number(body.imported) || 0, syncTotal: Number(body.total) || 0, lastSyncAt: new Date().toISOString(), ...(body.error ? { lastSyncError: String(body.error).slice(0, 180) } : {}) };
+      const rawError = String(body.error || "").trim();
+      const syncError = rawError.length < 8 ? "WhatsApp Web is not ready to expose existing chat history yet. TickLoop will retry automatically." : rawError.slice(0, 180);
+      const metadata = { ...(connection.metadata || {}), syncStatus: body.status || "syncing", syncImported: Number(body.imported) || 0, syncTotal: Number(body.total) || 0, lastSyncAt: new Date().toISOString(), ...(body.error ? { lastSyncError: syncError } : {}) };
       if (body.status === "complete") delete metadata.lastSyncError;
       await q`UPDATE tl_connections SET metadata=${JSON.stringify(metadata)}::jsonb,updated_at=now() WHERE id=${connection.id}`;
       return NextResponse.json({ ok: true });
