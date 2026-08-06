@@ -130,101 +130,98 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .connectButton.isConnected{background:#e9f8ee;border-color:#bfe3ca;color:#1f6c3d;cursor:default}
 
 /* --- Financial dashboard (/finance) --------------------------------------
-   A document-scrolling dashboard like /admin (not the fixed-viewport inbox).
-   Reuses .primary, .eyebrow, .tableWrap and the --ink/--green/--line tokens. */
-.finShell{min-height:100vh;background:#f5f8f5;padding:clamp(20px,4vw,56px);color:var(--ink)}
-.finHeader{max-width:1240px;margin:0 auto 22px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
-.finHeader h1{margin:0;font-size:clamp(28px,4vw,44px);letter-spacing:-.065em}
+   Laid out as spreadsheet grids: real cell borders, sticky row headers, tabular
+   figures, zebra rows. Modernised with a rounded sheet frame, soft shadow and
+   the brand green for header bands and accents. Reuses .primary and .eyebrow. */
+.finShell{min-height:100vh;background:#eef2ee;padding:clamp(18px,3.5vw,48px);color:var(--ink)}
+.finHeader{max-width:1320px;margin:0 auto 20px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.finHeader h1{margin:0;font-size:clamp(27px,3.6vw,42px);letter-spacing:-.065em}
 .finHeader .eyebrow{margin:0 0 7px}
-.finControls{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.finControls select{border:1px solid #d3e0d7;border-radius:10px;padding:10px 11px;background:#fff;font-weight:700;font-size:13px;color:var(--ink)}
-.finGhost{border:1px solid #bedcc6;border-radius:10px;background:#fff;color:#246b40;padding:10px 13px;font-size:13px;font-weight:800;cursor:pointer}
-.finBack{border:1px solid var(--line);border-radius:10px;background:#fff;color:#4a5a51;padding:10px 13px;font-size:13px;font-weight:750;text-decoration:none}
-.finError,.finWarn,.finOk{max-width:1240px;margin:0 auto 12px;padding:11px 14px;border-radius:11px;font-size:12px;line-height:1.5}
+.finControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.finControls select{border:1px solid #ccdad1;border-radius:9px;padding:9px 11px;background:#fff;font-weight:700;font-size:13px;color:var(--ink)}
+.finGhost{border:1px solid #bedcc6;border-radius:9px;background:#fff;color:#246b40;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer}
+.finBack{border:1px solid var(--line);border-radius:9px;background:#fff;color:#4a5a51;padding:9px 13px;font-size:13px;font-weight:750;text-decoration:none}
+.finError,.finWarn,.finOk{max-width:1320px;margin:0 auto 10px;padding:11px 14px;border-radius:10px;font-size:12.5px;line-height:1.55}
 .finError{background:#fff0f1;color:#a1233d;border:1px solid #f4ccd4}
 .finWarn{background:#fffbef;color:#75591b;border:1px solid #f0dfb3}
 .finOk{background:#effaf1;color:#256f42;border:1px solid #d3eed9}
-.finMuted{color:var(--muted);font-size:12px}
-.finPad{margin:0 0 14px}
-.finStats{max-width:1240px;margin:0 auto 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
-.finStats article{background:#fff;border:1px solid #e0e9e2;border-radius:16px;padding:18px;display:grid;gap:5px}
-.finStats span{font-size:12px;color:var(--muted);font-weight:700}
-.finStats b{font-size:clamp(22px,2.4vw,30px);letter-spacing:-.055em}
-.finStats small{color:var(--muted);font-size:11px}
-.finStats .finPositive b{color:#1f7340}
-.finStats .finNegative b{color:#a1233d}
-.finGrid{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1.05fr .95fr;gap:16px;align-items:start}
-.finCard{max-width:1240px;margin:0 auto 16px;background:#fff;border:1px solid #e0e9e2;border-radius:18px;overflow:hidden}
-.finGrid .finCard{margin:0;width:100%}
-.finCardHead{padding:20px 22px;border-bottom:1px solid var(--line)}
-.finCardHeadRow{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
-.finCardHead h2{margin:0;font-size:19px;letter-spacing:-.045em}
-.finCardHead p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
-.finCardHead h3{margin:0;font-size:14px;letter-spacing:-.02em}
-/* P&L rows */
-.finPL{margin:0;padding:0 22px}
-.finPLRow{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:13px 0;border-bottom:1px solid #edf1ee}
-.finPLRow dt{font-size:13px;font-weight:650;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.finPLRow dt small{display:block;width:100%;color:var(--muted);font-size:11px;font-weight:400}
-.finPLRow dd{margin:0;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.finMuted{color:var(--muted)}
+/* headline cells — the boxed row at the top of a sheet */
+.finBoxRow{max-width:1320px;margin:0 auto 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#fff;border:1px solid #d3dfd7;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px #16311f0d}
+.finBox{padding:16px 18px;display:grid;gap:5px;border-right:1px solid #e6ece8}
+.finBox:last-child{border-right:0}
+.finBox span{font-size:11.5px;color:var(--muted);font-weight:750}
+.finBox b{font-size:clamp(21px,2.3vw,29px);letter-spacing:-.055em;font-variant-numeric:tabular-nums}
+.finBox small{color:var(--muted);font-size:11px}
+.finBox-good b{color:#1c6f3c}
+.finBox-bad b{color:#a1233d}
+/* the sheet frame */
+.finSheet{max-width:1320px;margin:0 auto 16px;background:#fff;border:1px solid #d3dfd7;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px #16311f0d}
+.finSheetHead{padding:16px 20px;border-bottom:1px solid #e0e8e3;background:linear-gradient(#fbfdfb,#f5f9f6)}
+.finSheetHeadRow{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.finSheetDivider{border-top:1px solid #e0e8e3}
+.finSheetHead h2{margin:0;font-size:17px;letter-spacing:-.04em}
+.finSheetHead h3{margin:0;font-size:14px;letter-spacing:-.02em}
+.finSheetHead p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+.finScroll{overflow-x:auto}
+/* the grid itself */
+.finGridTable{border-collapse:separate;border-spacing:0;width:100%;min-width:620px;font-variant-numeric:tabular-nums}
+.finGridTable th,.finGridTable td{padding:10px 14px;font-size:13px;text-align:right;border-bottom:1px solid #eaefec;border-right:1px solid #eaefec;white-space:nowrap}
+.finGridTable th:last-child,.finGridTable td:last-child{border-right:0}
+.finGridTable thead th{position:sticky;top:0;z-index:2;background:#17221b;color:#dfeee4;font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:850;border-right-color:#2b3a31;border-bottom:0}
+.finGridTable .finRowHead{text-align:left;font-weight:700;color:var(--ink);background:#fbfcfb;font-variant-numeric:normal}
+.finGridTable thead .finRowHead{background:#17221b;color:#dfeee4}
+.finGridTable tbody tr:nth-child(even) td{background:#fcfdfc}
+.finGridTable tbody tr:hover td,.finGridTable tbody tr:hover .finRowHead{background:#f2f9f4}
+.finRowHead small{display:block;margin-top:3px;font-size:10.5px;font-weight:600;color:#8a6510}
+.finIndent{padding-left:26px!important;font-weight:600;color:#3f4a45}
+.finSubHead{font-weight:600;color:var(--muted);font-size:12px}
 .finDeduct{color:#a1233d}
-.finTag{border-radius:99px;padding:3px 7px;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
-.finTag.tiktok{background:#e2f8e8;color:#227343}
+.finEmpty{text-align:center!important;color:var(--muted);font-size:12.5px;padding:18px 14px}
+.finEmptyPad{margin:0;padding:22px}
+.finUnmapped td,.finUnmapped .finRowHead{background:#fffdf4!important}
+/* subtotal / total / group rows */
+.finSubtotalRow td,.finSubtotalRow .finRowHead{background:#f4f8f5!important;font-weight:800}
+.finGroupRow th,.finGroupRow td{background:#eef6f0!important;color:#20623b;font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:850;border-top:1px solid #d8e8de}
+.finTotalRow th,.finTotalRow td{background:#17221b!important;color:#fff;font-weight:850;font-size:14px;border-bottom:0;border-right-color:#2b3a31}
+.finGridTable tfoot tr:not(.finTotalRow) td,.finGridTable tfoot tr:not(.finTotalRow) .finRowHead{background:#f7faf8;border-bottom:0}
+.finPLTable{min-width:720px}
+/* source tags */
+.finTag{display:inline-block;border-radius:99px;padding:3px 8px;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
+.finTag.tiktok{background:#e2f8e8;color:#1f6c3d}
 .finTag.manual{background:#fff5d8;color:#8a6510}
 .finTag.calc{background:#eef3f0;color:#5e6d63}
-.finTotal{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:4px 22px 0;padding:16px 0;border-top:2px solid #dfe7e1}
-.finTotal span{display:block;font-size:11px;color:var(--muted);font-weight:750}
-.finTotal b{display:block;margin-top:4px;font-size:20px;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
-.finFootnote{margin:0;padding:15px 22px 20px;color:var(--muted);font-size:11px;line-height:1.6;border-top:1px solid var(--line)}
-/* Tables */
-.finTable{border-collapse:collapse;width:100%;min-width:520px}
-.finTable th,.finTable td{text-align:left;padding:11px 14px;border-bottom:1px solid #edf1ee;font-size:13px}
-.finTable thead th{color:#718076;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:850}
-.finTable tfoot th{font-size:13px;border-top:2px solid #dfe7e1;border-bottom:0;font-variant-numeric:tabular-nums}
-.finTable td{font-variant-numeric:tabular-nums}
-.finTable td:first-child,.finTable th:first-child{font-variant-numeric:normal}
-.finTable td small{display:block;color:#8a6510;font-size:11px;margin-top:3px}
-.finTable code{font-size:11px;color:#4a5a51;background:#f2f5f3;border-radius:5px;padding:2px 5px}
-.finTable input{width:100%;min-width:80px;border:1px solid #d8e3db;border-radius:8px;padding:7px 8px;font-size:13px;outline-color:#80bf95}
-.finUnmapped td{background:#fffdf5}
-/* Settlement breakdown */
-.finGroup{padding:16px 22px;border-bottom:1px solid #edf1ee}
-.finGroup>h3{margin:0 0 3px;font-size:13px;letter-spacing:-.01em}
-.finGroup>.finMuted{margin:0 0 12px}
-.finGroupHead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
-.finGroupHead h3{margin:0;font-size:10px;font-weight:850;letter-spacing:.11em;text-transform:uppercase;color:#2b7843}
-.finGroupHead b{font-size:14px;font-variant-numeric:tabular-nums}
-.finLine{display:flex;align-items:center;gap:11px;padding:4px 0}
-.finLineLabel{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#3f4a45}
-.finBar{flex:none;width:78px;height:6px;border-radius:99px;background:#eef1ef;overflow:hidden}
-.finBar i{display:block;height:100%;border-radius:99px}
-.finBar i.down{background:#d98a7a}
-.finBar i.up{background:#8ec9a1}
-.finShare{flex:none;width:44px;text-align:right;font-size:11px;color:#9aa39e;font-variant-numeric:tabular-nums}
-.finAmount{flex:none;width:100px;text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
-.finSettleTotal{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 22px;background:#f1faf3;border-top:2px solid #dfe7e1}
-.finSettleTotal span{font-size:14px;font-weight:850}
-.finSettleTotal b{font-size:19px;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
-.finReserve{display:flex;justify-content:space-between;gap:12px;padding:11px 22px;border-top:1px solid var(--line);font-size:12px;color:#65706b}
-.finReserve b{font-variant-numeric:tabular-nums;color:var(--ink)}
-/* Cost setup */
-.finFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
-.finFields label,.finField{border:1px solid #e1e7e3;border-radius:12px;padding:12px;display:block;font-size:11px;font-weight:800;color:#6d7a72}
+/* inline share bar inside a cell */
+.finCellBar{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;width:150px}
+.finCellBar i{flex:1;height:6px;border-radius:99px;background:#eaefec;position:relative;max-width:96px}
+.finCellBar i.down{box-shadow:inset 0 0 0 99px #d98a7a}
+.finCellBar i.up{box-shadow:inset 0 0 0 99px #6fbf8d}
+.finCellBar em{font-style:normal;font-size:11px;color:#8d968f;width:42px;text-align:right}
+.finFootnote{margin:0;padding:14px 20px 18px;color:var(--muted);font-size:11.5px;line-height:1.65;border-top:1px solid #e0e8e3;background:#fbfcfb}
+/* editable cells */
+.finEditable input{width:100%;min-width:86px;border:1px solid transparent;border-radius:6px;padding:6px 7px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums;background:#f4f8f5;outline-color:#80bf95;color:var(--ink)}
+.finEditable input:hover{border-color:#cfe0d5}
+.finEditable input:focus{background:#fff;border-color:#80bf95}
+.finEditable td:nth-child(3) input{text-align:left}
+.finNameCell{text-align:left!important;font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.finGridTable code{font-size:11.5px;background:#f0f4f1;border-radius:5px;padding:2px 6px}
+/* cost fields */
+.finFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-bottom:1px solid #e0e8e3}
+.finFields label,.finFields .finField{padding:14px 18px;display:block;font-size:11px;font-weight:800;color:var(--muted);border-right:1px solid #eaefec;border-top:1px solid #eaefec}
 .finFields label input,.finField input{width:100%;margin-top:7px;border:1px solid #d8e3db;border-radius:8px;padding:8px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;outline-color:#80bf95}
 .finField b{display:block;margin-top:7px;font-size:17px;letter-spacing:-.04em;color:var(--ink);font-variant-numeric:tabular-nums}
 .finFieldHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .finLink{border:0;background:none;color:#2b7843;font-size:10px;font-weight:850;cursor:pointer;padding:0}
 .finFromTikTok{display:block;margin-top:2px;color:#2b7843;font-size:10px;font-weight:800}
-.finSaveRow{display:flex;align-items:center;gap:12px;padding:16px 22px}
-@media(max-width:1000px){.finGrid{grid-template-columns:1fr}.finStats{grid-template-columns:repeat(2,1fr)}}
+.finSaveRow{display:flex;align-items:center;gap:12px;padding:14px 20px}
+@media(max-width:1000px){.finBoxRow{grid-template-columns:repeat(2,1fr)}.finBox:nth-child(2){border-right:0}.finBox:nth-child(-n+2){border-bottom:1px solid #e6ece8}.finFields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){
-  .finShell{padding:18px 14px}
+  .finShell{padding:16px 12px}
   .finHeader{flex-direction:column;align-items:flex-start}
-  .finControls{width:100%}
-  .finStats{grid-template-columns:1fr;gap:10px}
-  .finTotal{grid-template-columns:1fr;gap:14px}
+  .finBoxRow{grid-template-columns:1fr}
+  .finBox{border-right:0;border-bottom:1px solid #e6ece8}
+  .finBox:last-child{border-bottom:0}
   .finFields{grid-template-columns:1fr}
-  .finBar,.finShare{display:none}
-  .finPL,.finGroup,.finCardHead,.finSaveRow{padding-left:16px;padding-right:16px}
-  .finSettleTotal,.finReserve{padding-left:16px;padding-right:16px}
+  .finCellBar{width:auto}.finCellBar i{display:none}
+  .finGridTable th,.finGridTable td{padding:9px 11px}
 }
