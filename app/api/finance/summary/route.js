@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../lib/auth";
-import { discoverSkus, financeSummary, listPeriodCosts, listProductCosts, saveOrders, saveSettlements } from "../../../../lib/finance";
+import { discoverSkus, financeSummary, listPeriodCosts, listProductCosts, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
 import { hasFinanceScope, normalizeOrder, searchAllOrders, shopAccess } from "../../../../lib/tiktok";
 import { fetchSettlements } from "../../../../lib/tiktok-finance";
 
@@ -79,10 +79,13 @@ export async function GET(request) {
       const financeScope = hasFinanceScope(access.grantedPermissions);
       let settlementResult = { rows: [], statements: [] };
       if (doSettlements) {
+        // Resume: skip statements already stored unless ?refresh=1 forces a re-read.
+        const skipStatementIds = searchParams.get("refresh") === "1" ? null : await syncedStatementIds(user.workspace_id);
         settlementResult = await fetchSettlements({
           accessToken: access.accessToken,
           shopCipher: access.shopCipher,
           statementTimeGe: Math.floor(Date.now() / 1000) - Math.min(Math.max(Number(searchParams.get("statementDays")) || 180, 1), 365) * 86400,
+          skipStatementIds,
         });
         if (settlementResult.error) {
           errors.push(financeScope === false
@@ -98,6 +101,7 @@ export async function GET(request) {
         settlements: settlementResult.rows.length,
         statements: settlementResult.statements.length,
         settlementsTruncated: settlementResult.truncated,
+        statementsSkipped: settlementResult.skipped || 0,
         sellerName: access.sellerName,
         financeScope,
         errors,

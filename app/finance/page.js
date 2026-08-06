@@ -236,6 +236,13 @@ function SettlementBreakdown({ data, money }) {
         <p className="finMuted finPad">No settlement data for this month yet. Payouts appear after TikTok closes the statement, so hit Sync TikTok once orders have settled.</p>
       ) : (
         <>
+          {data.lineDrift?.length > 0 && (
+            <p className="finWarn finPad">
+              A breakdown subtotal does not match the total TikTok reports for it
+              ({data.lineDrift.map((entry) => `${entry.group} off by ${money(entry.drift)}`).join(", ")}).
+              A line is being double-counted or missed — trust Duit Masuk over the breakdown until this is fixed.
+            </p>
+          )}
           {Math.abs(data.settlementDrift) > 0.05 && (
             <p className="finWarn finPad">
               Revenue + fees + shipping + adjustments is off from the reported settlement by {money(data.settlementDrift)}. TikTok may be sending a component this dashboard does not read yet — treat the breakdown as indicative and Duit Masuk as authoritative.
