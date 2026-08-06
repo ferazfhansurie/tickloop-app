@@ -6,7 +6,9 @@ import { fetchSettlements } from "../../../../lib/tiktok-finance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// A first sync walks ~90 days of orders and every payout statement behind them,
+// which is comfortably more than the 60s default allows on a busy shop.
+export const maxDuration = 300;
 
 // A message per shopAccess failure, so the dashboard never shows a bare error code.
 const ACCESS_MESSAGES = {
@@ -52,28 +54,43 @@ export async function GET(request) {
         return NextResponse.json({ error: ACCESS_MESSAGES[access.reason] || access.reason, reason: access.reason, detail: access.detail || null }, { status: 409 });
       }
 
+      // `only` lets each half be re-run alone. A slow order walk must never
+      // starve the settlement sync, which is the half that carries the money.
+      const only = searchParams.get("only");
+      const doOrders = only !== "settlements";
+      const doSettlements = only !== "orders";
+
       const days = Math.min(Math.max(Number(searchParams.get("days")) || 90, 1), 90);
-      const createTimeGe = Math.floor(Date.now() / 1000) - days * 86400;
       const errors = [];
+      let orders = [];
+      let orderResult = {};
 
-      const orderResult = await searchAllOrders({ accessToken: access.accessToken, shopCipher: access.shopCipher, createTimeGe });
-      if (orderResult.error) errors.push(`Orders: ${orderResult.error}`);
-      const orders = (orderResult.orders || []).map(normalizeOrder);
-      if (orders.length) await saveOrders(user.workspace_id, orders);
-
-      // Settlements need the Seller Finance scope; say so plainly if it is missing.
-      const financeScope = hasFinanceScope(access.grantedPermissions);
-      const settlementResult = await fetchSettlements({
-        accessToken: access.accessToken,
-        shopCipher: access.shopCipher,
-        statementTimeGe: Math.floor(Date.now() / 1000) - Math.min(Math.max(Number(searchParams.get("days")) || 90, 1), 365) * 86400,
-      });
-      if (settlementResult.error) {
-        errors.push(financeScope === false
-          ? `Settlements: ${settlementResult.error}. The Finance permission was not granted at authorization — reconnect the shop and approve it.`
-          : `Settlements: ${settlementResult.error}`);
+      if (doOrders) {
+        orderResult = await searchAllOrders({
+          accessToken: access.accessToken,
+          shopCipher: access.shopCipher,
+          createTimeGe: Math.floor(Date.now() / 1000) - days * 86400,
+        });
+        if (orderResult.error) errors.push(`Orders: ${orderResult.error}`);
+        orders = (orderResult.orders || []).map(normalizeOrder);
+        if (orders.length) await saveOrders(user.workspace_id, orders);
       }
-      if (settlementResult.rows.length) await saveSettlements(user.workspace_id, settlementResult.rows);
+
+      const financeScope = hasFinanceScope(access.grantedPermissions);
+      let settlementResult = { rows: [], statements: [] };
+      if (doSettlements) {
+        settlementResult = await fetchSettlements({
+          accessToken: access.accessToken,
+          shopCipher: access.shopCipher,
+          statementTimeGe: Math.floor(Date.now() / 1000) - Math.min(Math.max(Number(searchParams.get("statementDays")) || 180, 1), 365) * 86400,
+        });
+        if (settlementResult.error) {
+          errors.push(financeScope === false
+            ? `Settlements: ${settlementResult.error}. The Finance permission was not granted at authorization — reconnect the shop and approve it.`
+            : `Settlements: ${settlementResult.error}`);
+        }
+        if (settlementResult.rows.length) await saveSettlements(user.workspace_id, settlementResult.rows);
+      }
 
       sync = {
         orders: orders.length,
