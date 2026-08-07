@@ -34,6 +34,18 @@ function monthRange(period) {
   return { from: new Date(Date.UTC(year, month - 1, 1)).toISOString(), to: new Date(Date.UTC(year, month, 1)).toISOString() };
 }
 
+/** "synced 4m ago" — tick is unused but forces a re-render so the label ages. */
+function freshness(lastSynced) {
+  if (!lastSynced) return "Never synced";
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(lastSynced).getTime()) / 1000));
+  if (seconds < 60) return "Synced just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `Synced ${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Synced ${hours}h ago`;
+  return `Synced ${Math.round(hours / 24)}d ago`;
+}
+
 /* ------------------------------------------------------------ cell helpers */
 
 const cell = (value, options = {}) => ({ value, ...options });
@@ -50,6 +62,8 @@ export default function FinancePage() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [showCosts, setShowCosts] = useState(false);
+  const [live, setLive] = useState(true);
+  const [tick, setTick] = useState(0);
 
   // Cost-entry state lives here so its cells can sit inside the same sheet.
   const [products, setProducts] = useState([]);
@@ -94,6 +108,24 @@ export default function FinancePage() {
   );
 
   useEffect(() => { load(false); }, [load]);
+
+  // Live mode re-reads stored data every 30s. The webhook and the hourly cron do
+  // the actual fetching from TikTok, so this stays cheap — no API quota is spent
+  // by leaving the page open.
+  //
+  // Paused while Cost setup is open: a refresh re-seeds the cost rows from the
+  // server, which would discard half-typed unit costs mid-edit.
+  useEffect(() => {
+    if (!live || showCosts) return undefined;
+    const id = setInterval(() => load(false), 30000);
+    return () => clearInterval(id);
+  }, [live, showCosts, load]);
+
+  // Re-renders the "synced Nm ago" label without refetching.
+  useEffect(() => {
+    const id = setInterval(() => setTick((value) => value + 1), 20000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!data) return;
@@ -360,11 +392,15 @@ export default function FinancePage() {
             {months.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
           </select>
           <button className="finGhost" onClick={() => setShowCosts((open) => !open)}>{showCosts ? "Hide cost setup" : "Cost setup"}</button>
+          <button className={`finLive${live ? " on" : ""}`} onClick={() => setLive((value) => !value)} title="Re-read every 30s">
+            <i />{live ? "Live" : "Paused"}
+          </button>
           <button className="primary" onClick={() => load(true)} disabled={syncing}>{syncing ? "Syncing…" : "Sync TikTok"}</button>
           <a className="finBack" href="/">Back</a>
         </div>
       </header>
 
+      {data && <p className="finFresh">{freshness(data.lastSynced, tick)}{!live ? " · live paused" : showCosts ? " · live paused while editing costs" : " · live, re-reading every 30s"}</p>}
       {error && <p className="finError">{error}</p>}
       {data?.sync?.errors?.length > 0 && data.sync.errors.map((message) => <p key={message} className="finWarn">{message}</p>)}
       {data?.sync && !data.sync.errors.length && (

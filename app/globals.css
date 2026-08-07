@@ -214,3 +214,10 @@ body:has(.emptyApp){overflow:hidden;height:100%}
   .xlBar i{display:none}
   .xlTabHint{display:none}
 }
+/* live toggle + freshness line */
+.finLive{display:inline-flex;align-items:center;gap:7px;border:1px solid #ccdad1;border-radius:8px;background:#fff;color:#7a857f;padding:9px 12px;font-size:13px;font-weight:800;cursor:pointer}
+.finLive.on{border-color:#bfe3ca;color:#1f6c3d;background:#f2fbf5}
+.finLive i{width:7px;height:7px;border-radius:50%;background:#c2ccc6;display:block}
+.finLive.on i{background:#35ab60;box-shadow:0 0 0 3px #35ab6024;animation:finPulse 2s ease-in-out infinite}
+@keyframes finPulse{50%{box-shadow:0 0 0 6px #35ab6000}}
+.finFresh{max-width:1440px;margin:-6px auto 10px;font-size:11.5px;color:#8b968f;font-weight:650}

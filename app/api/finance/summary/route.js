@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../lib/auth";
-import { discoverSkus, financeSummary, listPeriodCosts, listProductCosts, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
+import { discoverSkus, financeSummary, lastSyncedAt, listPeriodCosts, listProductCosts, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
 import { hasFinanceScope, normalizeOrder, searchAllOrders, shopAccess } from "../../../../lib/tiktok";
 import { fetchSettlements } from "../../../../lib/tiktok-finance";
 
@@ -109,13 +109,14 @@ export async function GET(request) {
     }
 
     const summary = await financeSummary(user.workspace_id, fromIso, toIso);
-    const [productCosts, periodCosts, skus] = await Promise.all([
+    const [productCosts, periodCosts, skus, lastSynced] = await Promise.all([
       listProductCosts(user.workspace_id),
       listPeriodCosts(user.workspace_id),
       discoverSkus(user.workspace_id),
+      lastSyncedAt(user.workspace_id),
     ]);
 
-    return NextResponse.json({ ...summary, productCosts, periodCosts, skus, ...(sync ? { sync } : {}) });
+    return NextResponse.json({ ...summary, productCosts, periodCosts, skus, lastSynced, ...(sync ? { sync } : {}) });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Could not build the summary." }, { status: 500 });
   }
