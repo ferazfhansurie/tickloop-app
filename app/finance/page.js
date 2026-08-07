@@ -2,13 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-// Laid out as spreadsheet grids, because that is the form the seller already
-// reconciles in. The values come from TikTok Shop's own finance model wherever
-// TikTok exposes them, so this reconciles against Seller Center rather than
-// approximating it.
+/**
+ * Rendered as an actual spreadsheet — lettered columns, numbered rows, a uniform
+ * cell grid — because that is the form the seller already reconciles in. Every
+ * block (P&L, bundles, settlement breakdown, cost entry) lives on one continuous
+ * sheet the way it would in Excel, rather than as separate web cards.
+ *
+ * Values come from TikTok Shop's own finance model wherever TikTok exposes them.
+ */
 
+const COLUMNS = ["A", "B", "C", "D", "E", "F", "G"];
 const GROUP_LABELS = { revenue: "Revenue", fee: "Fees & commissions", tax: "Tax", shipping: "Shipping", adjustment: "Adjustments" };
 const GROUP_ORDER = ["revenue", "fee", "tax", "shipping", "adjustment"];
+const SOURCE_LABEL = { tiktok: "TikTok", manual: "Manual", calc: "Calc" };
 
 function monthValue(date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -28,6 +34,14 @@ function monthRange(period) {
   return { from: new Date(Date.UTC(year, month - 1, 1)).toISOString(), to: new Date(Date.UTC(year, month, 1)).toISOString() };
 }
 
+/* ------------------------------------------------------------ cell helpers */
+
+const cell = (value, options = {}) => ({ value, ...options });
+const blank = () => cell("");
+/** A section heading that spans the sheet, like a merged cell. */
+const title = (text) => [cell(text, { className: "xlTitle", span: COLUMNS.length })];
+const spacer = () => [];
+
 export default function FinancePage() {
   const months = useMemo(monthOptions, []);
   const [period, setPeriod] = useState(months[0].value);
@@ -36,6 +50,12 @@ export default function FinancePage() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [showCosts, setShowCosts] = useState(false);
+
+  // Cost-entry state lives here so its cells can sit inside the same sheet.
+  const [products, setProducts] = useState([]);
+  const [periodCost, setPeriodCost] = useState({ period, adsCard: 0, adCredit: 0, whtRate: 0.1, otherCost: 0, adsGmvPayOverride: null, notes: null });
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   const money = useCallback(
     (value) => {
@@ -75,8 +95,258 @@ export default function FinancePage() {
 
   useEffect(() => { load(false); }, [load]);
 
+  useEffect(() => {
+    if (!data) return;
+    const existing = new Map((data.productCosts || []).map((cost) => [cost.skuKey, cost]));
+    const rows = (data.skus || []).map((sku, index) => {
+      const found = existing.get(sku.skuKey);
+      return {
+        skuKey: sku.skuKey,
+        label: sku.skuName || sku.productName || sku.skuKey,
+        bundle: found?.bundle || sku.skuName || sku.productName || sku.skuKey,
+        unitCost: found?.unitCost ?? 0,
+        bottles: found?.bottles ?? 0,
+        sortOrder: found?.sortOrder ?? index,
+        quantity: sku.quantity,
+      };
+    });
+    for (const cost of data.productCosts || []) {
+      if (!rows.some((row) => row.skuKey === cost.skuKey)) rows.push({ ...cost, label: cost.bundle, quantity: 0 });
+    }
+    setProducts(rows);
+    const found = (data.periodCosts || []).find((cost) => cost.period === period);
+    setPeriodCost(found || { period, adsCard: 0, adCredit: 0, whtRate: 0.1, otherCost: 0, adsGmvPayOverride: null, notes: null });
+  }, [data, period]);
+
+  async function saveCosts() {
+    setSaving(true);
+    setSaveMessage("");
+    try {
+      const response = await fetch("/api/finance/costs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ products, period: periodCost }),
+      });
+      const payload = await response.json();
+      if (!response.ok) { setSaveMessage(payload.error || "Could not save."); return; }
+      setSaveMessage("Saved.");
+      load(false);
+    } catch (caught) {
+      setSaveMessage(caught.message || "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const updateProduct = (index, patch) => setProducts((rows) => rows.map((row, position) => (position === index ? { ...row, ...patch } : row)));
+
+  /* ------------------------------------------------------- build the sheet */
+  const rows = useMemo(() => {
+    if (!data) return [];
+    const out = [];
+    const num = (value, options = {}) => cell(money(value), { className: `xlNum${options.negative ? " xlNeg" : ""}${options.fill ? ` xl${options.fill}` : ""}`, ...options });
+
+    /* ---- summary block ---- */
+    out.push(title("SUMMARY"));
+    out.push([
+      cell("Total Sales", { className: "xlHead" }),
+      cell("Duit Masuk", { className: "xlHead" }),
+      cell("Nett Profit", { className: "xlHead" }),
+      cell("Profit %", { className: "xlHead" }),
+      cell("Unit ME", { className: "xlHead" }),
+      cell("Orders", { className: "xlHead" }),
+      cell("Settled", { className: "xlHead" }),
+    ]);
+    out.push([
+      num(data.totalSales, { fill: "Yellow" }),
+      num(data.duitMasuk, { fill: "Yellow" }),
+      num(data.nettProfit, { fill: "Yellow", negative: data.nettProfit < 0 }),
+      cell(`${(data.profitPercentage * 100).toFixed(2)}%`, { className: "xlNum xlYellow" }),
+      cell(data.unitMe.toLocaleString(), { className: "xlNum xlYellow" }),
+      cell(data.orderCount.toLocaleString(), { className: "xlNum" }),
+      cell(`${data.settledOrders} / ${data.orderCount}`, { className: "xlNum" }),
+    ]);
+    out.push(spacer());
+
+    /* ---- P&L block ---- */
+    out.push(title("PROFIT & LOSS"));
+    out.push([
+      cell("Item", { className: "xlHead" }),
+      cell("Amount", { className: "xlHead" }),
+      cell("Source", { className: "xlHead" }),
+      cell("Basis", { className: "xlHead", span: 4 }),
+    ]);
+    const plRow = (label, amount, source, basis, options = {}) => out.push([
+      cell(label, { className: `xlLabel${options.strong ? " xlStrong" : ""}` }),
+      num(amount, { fill: options.fill, negative: options.negative }),
+      cell(SOURCE_LABEL[source], { className: `xlTag xlTag-${source}` }),
+      cell(basis, { className: "xlNote", span: 4 }),
+    ]);
+
+    plRow("Total Sales (Order Amount)", data.totalSales, "tiktok", `all ${data.orderCount} orders`);
+    if (data.pendingSales > 0) plRow("Less: sales not yet settled", -data.pendingSales, "tiktok", `${data.pendingOrders} orders still pending payout`, { negative: true });
+    plRow("Settled sales", data.settledSales, "tiktok", `${data.settledOrders} settled orders`, { strong: true });
+    plRow("Duit Masuk (Total settlement)", data.duitMasuk, "tiktok", `${(data.settlementRate * 100).toFixed(1)}% of settled sales`, { strong: true, fill: "Yellow" });
+    plRow("Kos Produk", -data.kosProdukSettled, "manual", "settled orders only", { negative: true, fill: "Yellow" });
+    plRow("Kos Ads By Card", -data.adsCard, "manual", "Ads Manager, whole month", { negative: true });
+    plRow("Kos Ads By GMV Pay", data.adsGmvPay, data.adsGmvPayIsOverride ? "manual" : "tiktok", "already inside settlement — not deducted twice");
+    plRow("Ad Credit", data.adCredit, "manual", "not netted off profit");
+    if (data.otherCost !== 0) plRow("Other cost", -data.otherCost, "manual", "whole month", { negative: true });
+    plRow(`WHT ${(data.whtRate * 100).toFixed(0)}% (To Pay)`, -data.wht, "calc", "on card + GMV Pay ad spend", { negative: true, fill: "Yellow" });
+    out.push([
+      cell("NETT PROFIT", { className: "xlTotalLabel" }),
+      cell(money(data.nettProfit), { className: `xlTotal xlNum${data.nettProfit < 0 ? " xlNeg" : ""}` }),
+      cell(`${(data.profitPercentage * 100).toFixed(2)}%`, { className: "xlTotal xlNum" }),
+      cell("of settled sales · margin on money received " + `${(data.marginOnSettlement * 100).toFixed(2)}%`, { className: "xlTotal", span: 4 }),
+    ]);
+    out.push(spacer());
+
+    /* ---- bundles block ---- */
+    out.push(title("QUANTITY BY BUNDLE"));
+    out.push([
+      cell("Bundle", { className: "xlHead" }),
+      cell("Qty", { className: "xlHead" }),
+      cell("Unit Cost", { className: "xlHead" }),
+      cell("Bottles", { className: "xlHead" }),
+      cell("Kos Produk", { className: "xlHead" }),
+      cell("", { className: "xlHead", span: 2 }),
+    ]);
+    if (!data.bundles.length) out.push([cell("No orders in this month yet.", { className: "xlNote", span: COLUMNS.length })]);
+    for (const bundle of data.bundles) {
+      out.push([
+        cell(bundle.bundle, { className: `xlLabel${bundle.matched ? "" : " xlUnmapped"}` }),
+        cell(bundle.quantity.toLocaleString(), { className: "xlNum" }),
+        cell(bundle.matched ? money(bundle.unitCost) : "—", { className: "xlNum" }),
+        cell(bundle.matched ? (bundle.bottles * bundle.quantity).toLocaleString() : "—", { className: "xlNum" }),
+        cell(bundle.matched ? money(bundle.totalCost) : "—", { className: "xlNum" }),
+        cell(bundle.matched ? "" : "no cost mapped", { className: "xlNote xlWarnCell", span: 2 }),
+      ]);
+    }
+    out.push([
+      cell("TOTAL", { className: "xlTotalLabel" }),
+      cell(data.totalQuantity.toLocaleString(), { className: "xlTotal xlNum" }),
+      cell("", { className: "xlTotal" }),
+      cell(data.unitMe.toLocaleString(), { className: "xlTotal xlNum" }),
+      cell(money(data.kosProduk), { className: "xlTotal xlNum" }),
+      cell("", { className: "xlTotal", span: 2 }),
+    ]);
+    out.push(spacer());
+
+    /* ---- settlement breakdown block ---- */
+    out.push(title("TIKTOK SHOP SETTLEMENT BREAKDOWN"));
+    if (!data.lines.length) {
+      out.push([cell("No settlement data for this month yet. Payouts appear after TikTok closes the statement.", { className: "xlNote", span: COLUMNS.length })]);
+    } else {
+      out.push([
+        cell("Line", { className: "xlHead", span: 3 }),
+        cell("Amount", { className: "xlHead" }),
+        cell("Share of revenue", { className: "xlHead", span: 3 }),
+      ]);
+      const base = Math.abs(data.revenueAmount) || Math.abs(data.settledSales) || 1;
+      for (const group of GROUP_ORDER) {
+        const lines = data.lines.filter((line) => line.group === group);
+        if (!lines.length) continue;
+        const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+        out.push([
+          cell(GROUP_LABELS[group], { className: "xlGroup", span: 3 }),
+          cell(money(subtotal), { className: "xlGroup xlNum" }),
+          cell("", { className: "xlGroup", span: 3 }),
+        ]);
+        for (const line of lines) {
+          const share = Math.min(100, (Math.abs(line.amount) / base) * 100);
+          out.push([
+            cell(line.label, { className: "xlLabel xlIndent", span: 3, title: line.key }),
+            cell(money(line.amount), { className: `xlNum${line.amount < 0 ? " xlNeg" : ""}` }),
+            cell(
+              <span className="xlBar"><i className={line.amount < 0 ? "down" : "up"} style={{ width: `${share.toFixed(1)}%` }} /><em>{share.toFixed(1)}%</em></span>,
+              { className: "xlBarCell", span: 3 },
+            ),
+          ]);
+        }
+      }
+      out.push([
+        cell("DUIT MASUK (TOTAL SETTLEMENT)", { className: "xlTotalLabel", span: 3 }),
+        cell(money(data.duitMasuk), { className: "xlTotal xlNum" }),
+        cell("", { className: "xlTotal", span: 3 }),
+      ]);
+      if (data.reserveAmount !== 0) {
+        out.push([
+          cell("Held in reserve (not yet paid out)", { className: "xlLabel", span: 3 }),
+          cell(money(data.reserveAmount), { className: "xlNum" }),
+          cell("", { span: 3 }),
+        ]);
+      }
+    }
+
+    /* ---- cost setup block ---- */
+    if (showCosts) {
+      out.push(spacer());
+      out.push(title("COST SETUP — the only numbers TikTok cannot supply"));
+      out.push([
+        cell("SKU", { className: "xlHead" }),
+        cell("TikTok name", { className: "xlHead", span: 2 }),
+        cell("Bundle name", { className: "xlHead" }),
+        cell("Unit Cost", { className: "xlHead" }),
+        cell("Bottles", { className: "xlHead" }),
+        cell("Sold", { className: "xlHead" }),
+      ]);
+      if (!products.length) out.push([cell("No SKUs yet — hit Sync TikTok first.", { className: "xlNote", span: COLUMNS.length })]);
+      products.forEach((product, index) => {
+        out.push([
+          cell(<code>{product.skuKey}</code>, { className: "xlLabel" }),
+          cell(product.label, { className: "xlNote", span: 2 }),
+          cell(<input value={product.bundle} onChange={(event) => updateProduct(index, { bundle: event.target.value })} />, { className: "xlInput" }),
+          cell(<input type="number" step="0.01" value={product.unitCost} onChange={(event) => updateProduct(index, { unitCost: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
+          cell(<input type="number" step="1" value={product.bottles} onChange={(event) => updateProduct(index, { bottles: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
+          cell(product.quantity.toLocaleString(), { className: "xlNum" }),
+        ]);
+      });
+
+      const syncedGmvPay = data.adsGmvPayIsOverride ? 0 : data.adsGmvPay;
+      const effectiveGmvPay = periodCost.adsGmvPayOverride ?? syncedGmvPay;
+      out.push(spacer());
+      out.push([
+        cell(`Ad spend & tax — ${period}`, { className: "xlSubTitle", span: COLUMNS.length }),
+      ]);
+      out.push([
+        cell("Kos Ads By Card", { className: "xlHead" }),
+        cell("Kos Ads By GMV Pay", { className: "xlHead" }),
+        cell("Ad Credit", { className: "xlHead" }),
+        cell("Other cost", { className: "xlHead" }),
+        cell("WHT rate %", { className: "xlHead" }),
+        cell("WHT to pay", { className: "xlHead", span: 2 }),
+      ]);
+      out.push([
+        cell(<input type="number" step="0.01" value={periodCost.adsCard} onChange={(event) => setPeriodCost({ ...periodCost, adsCard: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
+        cell(
+          periodCost.adsGmvPayOverride === null
+            ? <span className="xlSynced">{money(syncedGmvPay)}<em>synced</em></span>
+            : <input type="number" step="0.01" value={periodCost.adsGmvPayOverride} onChange={(event) => setPeriodCost({ ...periodCost, adsGmvPayOverride: Number(event.target.value) })} />,
+          { className: "xlInput xlNum" },
+        ),
+        cell(<input type="number" step="0.01" value={periodCost.adCredit} onChange={(event) => setPeriodCost({ ...periodCost, adCredit: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
+        cell(<input type="number" step="0.01" value={periodCost.otherCost} onChange={(event) => setPeriodCost({ ...periodCost, otherCost: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
+        cell(<input type="number" step="0.1" value={(periodCost.whtRate * 100).toFixed(1)} onChange={(event) => setPeriodCost({ ...periodCost, whtRate: Number(event.target.value) / 100 })} />, { className: "xlInput xlNum" }),
+        cell(money(periodCost.whtRate * (periodCost.adsCard + effectiveGmvPay)), { className: "xlNum xlYellow", span: 2 }),
+      ]);
+      out.push([
+        cell(
+          <span className="xlActions">
+            <button className="primary" onClick={saveCosts} disabled={saving}>{saving ? "Saving…" : "Save cost setup"}</button>
+            <button className="finLink" onClick={() => setPeriodCost({ ...periodCost, adsGmvPayOverride: periodCost.adsGmvPayOverride === null ? Number((data.adsGmvPayIsOverride ? 0 : data.adsGmvPay).toFixed(2)) : null })}>
+              {periodCost.adsGmvPayOverride === null ? "Override GMV Pay" : "Use synced GMV Pay"}
+            </button>
+            {saveMessage && <em>{saveMessage}</em>}
+          </span>,
+          { span: COLUMNS.length, className: "xlActionsCell" },
+        ),
+      ]);
+    }
+
+    return out;
+  }, [data, money, showCosts, products, periodCost, saving, saveMessage, period]);
+
   const settledPercent = data && data.orderCount > 0 ? (data.settledOrders / data.orderCount) * 100 : 0;
-  const partial = data && data.pendingOrders > 0;
 
   return (
     <main className="finShell">
@@ -104,334 +374,66 @@ export default function FinancePage() {
           {data.sync.sellerName ? ` · ${data.sync.sellerName}` : ""}.
         </p>
       )}
+      {data?.lineDrift?.length > 0 && (
+        <p className="finWarn">
+          A breakdown subtotal does not match the total TikTok reports for it
+          ({data.lineDrift.map((entry) => `${entry.group} off by ${money(entry.drift)}`).join(", ")}).
+          Re-sync with <code>&amp;refresh=1</code>; until then trust Duit Masuk over the breakdown.
+        </p>
+      )}
+      {data?.pendingOrders > 0 && (
+        <p className="finWarn">
+          <b>This month is still paying out.</b> {data.settledOrders} of {data.orderCount} orders have settled ({settledPercent.toFixed(0)}%),
+          leaving {money(data.pendingSales)} of sales pending. The P&amp;L covers settled orders only, so it is a true margin on money received — not the month&apos;s final result.
+        </p>
+      )}
+      {data?.unmappedSkus?.length > 0 && (
+        <p className="finWarn">
+          {data.unmappedSkus.length} SKU{data.unmappedSkus.length === 1 ? " has" : "s have"} no product cost mapped
+          ({data.unmappedSkus.slice(0, 3).map((sku) => sku.skuKey).join(", ")}{data.unmappedSkus.length > 3 ? "…" : ""}).
+          Kos Produk reads low and profit reads high until you map {data.unmappedSkus.length === 1 ? "it" : "them"} in Cost setup.
+        </p>
+      )}
+
       {loading && !data && <p className="finMuted">Loading…</p>}
 
       {data && (
-        <>
-          {data.lineDrift?.length > 0 && (
-            <p className="finWarn">
-              A breakdown subtotal does not match the total TikTok reports for it
-              ({data.lineDrift.map((entry) => `${entry.group} off by ${money(entry.drift)}`).join(", ")}).
-              A line is being double-counted or missed — trust Duit Masuk over the breakdown until this is fixed.
-            </p>
-          )}
-          {Math.abs(data.settlementDrift) > 0.05 && (
-            <p className="finWarn">
-              Revenue + fees + shipping + adjustments is off from the reported settlement by {money(data.settlementDrift)}. Treat the breakdown as indicative and Duit Masuk as authoritative.
-            </p>
-          )}
-          {partial && (
-            <p className="finWarn">
-              <b>This month is still paying out.</b> {data.settledOrders} of {data.orderCount} orders have settled
-              ({settledPercent.toFixed(0)}%), leaving {money(data.pendingSales)} of sales pending. The P&amp;L below covers only
-              settled orders, so it is a true margin on money received — not the month&apos;s final result.
-            </p>
-          )}
-          {data.unmappedSkus.length > 0 && (
-            <p className="finWarn">
-              {data.unmappedSkus.length} SKU{data.unmappedSkus.length === 1 ? " has" : "s have"} no product cost mapped
-              ({data.unmappedSkus.slice(0, 3).map((sku) => sku.skuKey).join(", ")}{data.unmappedSkus.length > 3 ? "…" : ""}).
-              Kos Produk reads low and profit reads high until you map {data.unmappedSkus.length === 1 ? "it" : "them"} in Cost setup.
-            </p>
-          )}
-
-          {/* ---- headline cells ---- */}
-          <section className="finBoxRow">
-            <Box label="Total Sales (Order Amount)" value={money(data.totalSales)} note={`${data.orderCount} orders`} />
-            <Box label="Duit Masuk (Total settlement)" value={money(data.duitMasuk)} note={`${data.settledOrders} of ${data.orderCount} settled`} />
-            <Box label="Nett Profit" value={money(data.nettProfit)} note={`${(data.profitPercentage * 100).toFixed(2)}% on settled sales`} tone={data.nettProfit < 0 ? "bad" : "good"} />
-            <Box label="Unit ME" value={data.unitMe.toLocaleString()} note={`${data.totalQuantity.toLocaleString()} units sold`} />
-          </section>
-
-          {showCosts && <CostSetup data={data} money={money} period={period} onSaved={() => load(false)} />}
-
-          {/* ---- P&L sheet ---- */}
-          <section className="finSheet">
-            <div className="finSheetHead">
-              <h2>Profit &amp; loss</h2>
-              <p>Each row is marked with where the number comes from, so measured and typed values are never confused.</p>
-            </div>
-            <div className="finScroll">
-              <table className="finGridTable finPLTable">
-                <thead>
-                  <tr><th className="finRowHead">Item</th><th>Amount</th><th>Source</th><th>Basis</th></tr>
-                </thead>
-                <tbody>
-                  <Row label="Total Sales (Order Amount)" amount={money(data.totalSales)} source="tiktok" basis={`all ${data.orderCount} orders`} />
-                  {data.pendingSales > 0 && <Row label="Less: sales not yet settled" amount={money(-data.pendingSales)} source="tiktok" basis={`${data.pendingOrders} orders pending`} deduct />}
-                  <Row label="Settled sales" amount={money(data.settledSales)} source="tiktok" basis={`${data.settledOrders} settled orders`} subtotal />
-                  <Row label="Duit Masuk (Total settlement)" amount={money(data.duitMasuk)} source="tiktok" basis={`${(data.settlementRate * 100).toFixed(1)}% of settled sales`} subtotal />
-                  <Row label="Kos Produk" amount={money(-data.kosProdukSettled)} source="manual" basis="settled orders only" deduct />
-                  <Row label="Kos Ads By Card" amount={money(-data.adsCard)} source="manual" basis="Ads Manager, whole month" deduct />
-                  <Row label="Kos Ads By GMV Pay" amount={money(data.adsGmvPay)} source={data.adsGmvPayIsOverride ? "manual" : "tiktok"} basis="already inside settlement" />
-                  <Row label="Ad Credit" amount={money(data.adCredit)} source="manual" basis="not netted off profit" />
-                  {data.otherCost !== 0 && <Row label="Other cost" amount={money(-data.otherCost)} source="manual" basis="whole month" deduct />}
-                  <Row label={`WHT ${(data.whtRate * 100).toFixed(0)}% (To Pay)`} amount={money(-data.wht)} source="calc" basis="on card + GMV Pay ads" deduct />
-                </tbody>
-                <tfoot>
-                  <tr className="finTotalRow">
-                    <th className="finRowHead">Nett Profit</th>
-                    <td className={data.nettProfit < 0 ? "finDeduct" : ""}>{money(data.nettProfit)}</td>
-                    <td colSpan={2}>{(data.profitPercentage * 100).toFixed(2)}% of settled sales</td>
+        <div className="xlFrame">
+          <div className="xlScroll">
+            <table className="xl">
+              <thead>
+                <tr>
+                  <th className="xlCorner" />
+                  {COLUMNS.map((column) => <th key={column} className="xlColHead">{column}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((cells, rowIndex) => (
+                  <tr key={rowIndex} className={cells.length === 0 ? "xlSpacer" : undefined}>
+                    <th className="xlRowNum">{rowIndex + 1}</th>
+                    <SheetRow cells={cells} />
                   </tr>
-                  <tr>
-                    <th className="finRowHead finSubHead">Margin on money received</th>
-                    <td>{(data.marginOnSettlement * 100).toFixed(2)}%</td>
-                    <td colSpan={2} className="finMuted">Nett Profit ÷ Duit Masuk</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <p className="finFootnote">
-              Nett Profit = Duit Masuk − Kos Produk − Kos Ads By Card − WHT{data.otherCost !== 0 ? " − Other cost" : ""}.
-              Kos Produk covers only settled orders, matching Duit Masuk — netting the cost of unsettled orders against settled income would invent a loss.
-              GMV Pay is <b>not</b> subtracted again: TikTok charges it as a fee inside the settlement, so it is already absent from Duit Masuk. It still drives WHT.
-            </p>
-          </section>
-
-          {/* ---- bundles sheet ---- */}
-          <section className="finSheet">
-            <div className="finSheetHead">
-              <h2>Quantity by bundle</h2>
-              <p>Everything sold this month. Unit ME counts bottles, so trial sachets set to 0 bottles never inflate it.</p>
-            </div>
-            <div className="finScroll">
-              <table className="finGridTable">
-                <thead>
-                  <tr><th className="finRowHead">Bundle</th><th>Qty</th><th>Unit cost</th><th>Bottles</th><th>Kos Produk</th></tr>
-                </thead>
-                <tbody>
-                  {data.bundles.length === 0 && <tr><td colSpan={5} className="finEmpty">No orders in this month yet.</td></tr>}
-                  {data.bundles.map((bundle) => (
-                    <tr key={bundle.bundle} className={bundle.matched ? "" : "finUnmapped"}>
-                      <th className="finRowHead">{bundle.bundle}{!bundle.matched && <small>no cost mapped</small>}</th>
-                      <td>{bundle.quantity.toLocaleString()}</td>
-                      <td>{bundle.matched ? money(bundle.unitCost) : "—"}</td>
-                      <td>{bundle.matched ? (bundle.bottles * bundle.quantity).toLocaleString() : "—"}</td>
-                      <td>{bundle.matched ? money(bundle.totalCost) : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="finTotalRow">
-                    <th className="finRowHead">Total</th>
-                    <td>{data.totalQuantity.toLocaleString()}</td>
-                    <td>—</td>
-                    <td>{data.unitMe.toLocaleString()}</td>
-                    <td>{money(data.kosProduk)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </section>
-
-          <SettlementSheet data={data} money={money} />
-        </>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="xlTabs"><span className="xlTab on">{period}</span><span className="xlTabHint">Values marked TikTok are measured; Manual are entered by you.</span></div>
+        </div>
       )}
     </main>
   );
 }
 
-function Box({ label, value, note, tone }) {
+/** Emits a row's cells and pads the remainder so the grid never has ragged edges. */
+function SheetRow({ cells }) {
+  const used = cells.reduce((total, item) => total + (item.span || 1), 0);
+  const padding = Math.max(0, COLUMNS.length - used);
   return (
-    <article className={`finBox${tone ? ` finBox-${tone}` : ""}`}>
-      <span>{label}</span>
-      <b>{value}</b>
-      <small>{note}</small>
-    </article>
-  );
-}
-
-const SOURCE_LABEL = { tiktok: "TikTok", manual: "Manual", calc: "Calculated" };
-
-function Row({ label, amount, source, basis, deduct, subtotal }) {
-  return (
-    <tr className={subtotal ? "finSubtotalRow" : ""}>
-      <th className="finRowHead">{label}</th>
-      <td className={deduct ? "finDeduct" : ""}>{amount}</td>
-      <td><span className={`finTag ${source}`}>{SOURCE_LABEL[source]}</span></td>
-      <td className="finMuted">{basis}</td>
-    </tr>
-  );
-}
-
-/**
- * TikTok's own settlement arithmetic, row by row. This is the part a spreadsheet
- * can only show as one lump: it makes visible whether margin is going to
- * commission, affiliate payouts, GMV Max ads or shipping.
- */
-function SettlementSheet({ data, money }) {
-  const base = Math.abs(data.revenueAmount) || Math.abs(data.settledSales) || 1;
-
-  return (
-    <section className="finSheet">
-      <div className="finSheetHead finSheetHeadRow">
-        <div>
-          <h2>TikTok Shop settlement breakdown</h2>
-          <p>Every fee TikTok took, exactly as it reports them. Deductions are negative.</p>
-        </div>
-        <span className="finMuted">{data.settledOrders} settled orders · {data.settledTransactions} transactions</span>
-      </div>
-
-      {data.lines.length === 0 ? (
-        <p className="finEmpty finEmptyPad">No settlement data for this month yet. Payouts appear after TikTok closes the statement.</p>
-      ) : (
-        <div className="finScroll">
-          <table className="finGridTable">
-            <thead>
-              <tr><th className="finRowHead">Line</th><th>Amount</th><th>Share of revenue</th></tr>
-            </thead>
-            {GROUP_ORDER.map((group) => {
-              const lines = data.lines.filter((line) => line.group === group);
-              if (!lines.length) return null;
-              const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
-              return (
-                <tbody key={group}>
-                  <tr className="finGroupRow"><th className="finRowHead" colSpan={2}>{GROUP_LABELS[group]}</th><td>{money(subtotal)}</td></tr>
-                  {lines.map((line) => {
-                    const share = Math.min(100, (Math.abs(line.amount) / base) * 100);
-                    return (
-                      <tr key={`${line.group}:${line.key}`}>
-                        <th className="finRowHead finIndent" title={line.key}>{line.label}</th>
-                        <td className={line.amount < 0 ? "finDeduct" : ""}>{money(line.amount)}</td>
-                        <td>
-                          <span className="finCellBar">
-                            <i className={line.amount < 0 ? "down" : "up"} style={{ width: `${share.toFixed(1)}%` }} />
-                            <em>{share.toFixed(1)}%</em>
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              );
-            })}
-            <tfoot>
-              <tr className="finTotalRow"><th className="finRowHead">Duit Masuk (Total settlement)</th><td>{money(data.duitMasuk)}</td><td /></tr>
-              {data.reserveAmount !== 0 && (
-                <tr><th className="finRowHead finSubHead">Held in reserve (not yet paid out)</th><td>{money(data.reserveAmount)}</td><td /></tr>
-              )}
-            </tfoot>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** Cost setup: the only numbers TikTok Shop cannot tell us. */
-function CostSetup({ data, money, period, onSaved }) {
-  const [products, setProducts] = useState([]);
-  const [periodCost, setPeriodCost] = useState({ period, adsCard: 0, adCredit: 0, whtRate: 0.1, otherCost: 0, adsGmvPayOverride: null, notes: null });
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-
-  // Seed the SKU rows from what has actually been sold, so nothing is typed by hand.
-  useEffect(() => {
-    const existing = new Map((data.productCosts || []).map((cost) => [cost.skuKey, cost]));
-    const rows = (data.skus || []).map((sku, index) => {
-      const found = existing.get(sku.skuKey);
-      return {
-        skuKey: sku.skuKey,
-        label: sku.skuName || sku.productName || sku.skuKey,
-        bundle: found?.bundle || sku.skuName || sku.productName || sku.skuKey,
-        unitCost: found?.unitCost ?? 0,
-        bottles: found?.bottles ?? 0,
-        sortOrder: found?.sortOrder ?? index,
-        quantity: sku.quantity,
-      };
-    });
-    for (const cost of data.productCosts || []) {
-      if (!rows.some((row) => row.skuKey === cost.skuKey)) rows.push({ ...cost, label: cost.bundle, quantity: 0 });
-    }
-    setProducts(rows);
-  }, [data.productCosts, data.skus]);
-
-  useEffect(() => {
-    const found = (data.periodCosts || []).find((cost) => cost.period === period);
-    setPeriodCost(found || { period, adsCard: 0, adCredit: 0, whtRate: 0.1, otherCost: 0, adsGmvPayOverride: null, notes: null });
-  }, [data.periodCosts, period]);
-
-  const update = (index, patch) => setProducts((rows) => rows.map((row, position) => (position === index ? { ...row, ...patch } : row)));
-
-  async function save() {
-    setSaving(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/finance/costs", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ products, period: periodCost }),
-      });
-      const payload = await response.json();
-      if (!response.ok) { setMessage(payload.error || "Could not save."); return; }
-      setMessage("Saved.");
-      onSaved();
-    } catch (error) {
-      setMessage(error.message || "Could not save.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const syncedGmvPay = data.adsGmvPayIsOverride ? 0 : data.adsGmvPay;
-  const effectiveGmvPay = periodCost.adsGmvPayOverride ?? syncedGmvPay;
-
-  return (
-    <section className="finSheet finCostSheet">
-      <div className="finSheetHead">
-        <h2>Cost setup</h2>
-        <p>The only numbers TikTok Shop cannot supply: what each bundle costs to make, and ad spend billed to a card in Ads Manager.</p>
-      </div>
-
-      <div className="finScroll">
-        <table className="finGridTable finEditable">
-          <thead>
-            <tr><th className="finRowHead">SKU</th><th>TikTok name</th><th>Bundle name</th><th>Unit cost</th><th>Bottles</th><th>Sold</th></tr>
-          </thead>
-          <tbody>
-            {products.length === 0 && <tr><td colSpan={6} className="finEmpty">No SKUs yet — hit Sync TikTok first.</td></tr>}
-            {products.map((product, index) => (
-              <tr key={product.skuKey}>
-                <th className="finRowHead"><code>{product.skuKey}</code></th>
-                <td className="finMuted finNameCell">{product.label}</td>
-                <td><input value={product.bundle} onChange={(event) => update(index, { bundle: event.target.value })} /></td>
-                <td><input type="number" step="0.01" value={product.unitCost} onChange={(event) => update(index, { unitCost: Number(event.target.value) })} /></td>
-                <td><input type="number" step="1" value={product.bottles} onChange={(event) => update(index, { bottles: Number(event.target.value) })} /></td>
-                <td>{product.quantity.toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="finSheetHead finSheetDivider">
-        <h3>Ad spend &amp; tax — {period}</h3>
-        <p>GMV Pay syncs from TikTok&apos;s GMV Max ad fee. Card-billed spend and ad credits live in TikTok Ads Manager, which a TikTok Shop authorization cannot reach.</p>
-      </div>
-      <div className="finFields">
-        <label>Kos Ads By Card<input type="number" step="0.01" value={periodCost.adsCard} onChange={(event) => setPeriodCost({ ...periodCost, adsCard: Number(event.target.value) })} /></label>
-        <div className="finField">
-          <div className="finFieldHead">
-            <span>Kos Ads By GMV Pay</span>
-            <button className="finLink" onClick={() => setPeriodCost({ ...periodCost, adsGmvPayOverride: periodCost.adsGmvPayOverride === null ? Number(syncedGmvPay.toFixed(2)) : null })}>
-              {periodCost.adsGmvPayOverride === null ? "Override" : "Use synced"}
-            </button>
-          </div>
-          {periodCost.adsGmvPayOverride === null
-            ? <><b>{money(syncedGmvPay)}</b><small className="finFromTikTok">Synced from TikTok</small></>
-            : <input type="number" step="0.01" value={periodCost.adsGmvPayOverride} onChange={(event) => setPeriodCost({ ...periodCost, adsGmvPayOverride: Number(event.target.value) })} />}
-        </div>
-        <label>Ad Credit<input type="number" step="0.01" value={periodCost.adCredit} onChange={(event) => setPeriodCost({ ...periodCost, adCredit: Number(event.target.value) })} /></label>
-        <label>Other cost<input type="number" step="0.01" value={periodCost.otherCost} onChange={(event) => setPeriodCost({ ...periodCost, otherCost: Number(event.target.value) })} /></label>
-        <label>WHT rate (%)<input type="number" step="0.1" value={(periodCost.whtRate * 100).toFixed(1)} onChange={(event) => setPeriodCost({ ...periodCost, whtRate: Number(event.target.value) / 100 })} /></label>
-        <div className="finField"><span>WHT to pay</span><b>{money(periodCost.whtRate * (periodCost.adsCard + effectiveGmvPay))}</b></div>
-      </div>
-
-      <div className="finSaveRow">
-        <button className="primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save cost setup"}</button>
-        {message && <span className="finMuted">{message}</span>}
-      </div>
-    </section>
+    <>
+      {cells.map((item, index) => (
+        <td key={index} className={item.className} colSpan={item.span || 1} title={item.title}>{item.value}</td>
+      ))}
+      {Array.from({ length: padding }, (_, index) => <td key={`pad-${index}`} />)}
+    </>
   );
 }

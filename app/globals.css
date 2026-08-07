@@ -130,98 +130,87 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .connectButton.isConnected{background:#e9f8ee;border-color:#bfe3ca;color:#1f6c3d;cursor:default}
 
 /* --- Financial dashboard (/finance) --------------------------------------
-   Laid out as spreadsheet grids: real cell borders, sticky row headers, tabular
-   figures, zebra rows. Modernised with a rounded sheet frame, soft shadow and
-   the brand green for header bands and accents. Reuses .primary and .eyebrow. */
-.finShell{min-height:100vh;background:#eef2ee;padding:clamp(18px,3.5vw,48px);color:var(--ink)}
-.finHeader{max-width:1320px;margin:0 auto 20px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
-.finHeader h1{margin:0;font-size:clamp(27px,3.6vw,42px);letter-spacing:-.065em}
-.finHeader .eyebrow{margin:0 0 7px}
+   A real spreadsheet: lettered columns, numbered rows, uniform 1px gridlines,
+   dense rows, frozen header and row gutter. Modernised only in the palette and
+   frame — brand green for header cells, warm amber for key values, a rounded
+   outer frame and soft shadow — so it reads as a sheet, not a web table. */
+.finShell{min-height:100vh;background:#e9eeea;padding:clamp(14px,2.5vw,34px);color:var(--ink)}
+.finHeader{max-width:1440px;margin:0 auto 16px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.finHeader h1{margin:0;font-size:clamp(25px,3.2vw,38px);letter-spacing:-.065em}
+.finHeader .eyebrow{margin:0 0 6px}
 .finControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.finControls select{border:1px solid #ccdad1;border-radius:9px;padding:9px 11px;background:#fff;font-weight:700;font-size:13px;color:var(--ink)}
-.finGhost{border:1px solid #bedcc6;border-radius:9px;background:#fff;color:#246b40;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer}
-.finBack{border:1px solid var(--line);border-radius:9px;background:#fff;color:#4a5a51;padding:9px 13px;font-size:13px;font-weight:750;text-decoration:none}
-.finError,.finWarn,.finOk{max-width:1320px;margin:0 auto 10px;padding:11px 14px;border-radius:10px;font-size:12.5px;line-height:1.55}
+.finControls select{border:1px solid #ccdad1;border-radius:8px;padding:9px 11px;background:#fff;font-weight:700;font-size:13px;color:var(--ink)}
+.finGhost{border:1px solid #bedcc6;border-radius:8px;background:#fff;color:#246b40;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer}
+.finBack{border:1px solid var(--line);border-radius:8px;background:#fff;color:#4a5a51;padding:9px 13px;font-size:13px;font-weight:750;text-decoration:none}
+.finError,.finWarn,.finOk{max-width:1440px;margin:0 auto 9px;padding:10px 13px;border-radius:9px;font-size:12.5px;line-height:1.55}
 .finError{background:#fff0f1;color:#a1233d;border:1px solid #f4ccd4}
 .finWarn{background:#fffbef;color:#75591b;border:1px solid #f0dfb3}
 .finOk{background:#effaf1;color:#256f42;border:1px solid #d3eed9}
+.finWarn code{background:#00000010;border-radius:4px;padding:1px 4px}
 .finMuted{color:var(--muted)}
-/* headline cells — the boxed row at the top of a sheet */
-.finBoxRow{max-width:1320px;margin:0 auto 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#fff;border:1px solid #d3dfd7;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px #16311f0d}
-.finBox{padding:16px 18px;display:grid;gap:5px;border-right:1px solid #e6ece8}
-.finBox:last-child{border-right:0}
-.finBox span{font-size:11.5px;color:var(--muted);font-weight:750}
-.finBox b{font-size:clamp(21px,2.3vw,29px);letter-spacing:-.055em;font-variant-numeric:tabular-nums}
-.finBox small{color:var(--muted);font-size:11px}
-.finBox-good b{color:#1c6f3c}
-.finBox-bad b{color:#a1233d}
 /* the sheet frame */
-.finSheet{max-width:1320px;margin:0 auto 16px;background:#fff;border:1px solid #d3dfd7;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px #16311f0d}
-.finSheetHead{padding:16px 20px;border-bottom:1px solid #e0e8e3;background:linear-gradient(#fbfdfb,#f5f9f6)}
-.finSheetHeadRow{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
-.finSheetDivider{border-top:1px solid #e0e8e3}
-.finSheetHead h2{margin:0;font-size:17px;letter-spacing:-.04em}
-.finSheetHead h3{margin:0;font-size:14px;letter-spacing:-.02em}
-.finSheetHead p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
-.finScroll{overflow-x:auto}
-/* the grid itself */
-.finGridTable{border-collapse:separate;border-spacing:0;width:100%;min-width:620px;font-variant-numeric:tabular-nums}
-.finGridTable th,.finGridTable td{padding:10px 14px;font-size:13px;text-align:right;border-bottom:1px solid #eaefec;border-right:1px solid #eaefec;white-space:nowrap}
-.finGridTable th:last-child,.finGridTable td:last-child{border-right:0}
-.finGridTable thead th{position:sticky;top:0;z-index:2;background:#17221b;color:#dfeee4;font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:850;border-right-color:#2b3a31;border-bottom:0}
-.finGridTable .finRowHead{text-align:left;font-weight:700;color:var(--ink);background:#fbfcfb;font-variant-numeric:normal}
-.finGridTable thead .finRowHead{background:#17221b;color:#dfeee4}
-.finGridTable tbody tr:nth-child(even) td{background:#fcfdfc}
-.finGridTable tbody tr:hover td,.finGridTable tbody tr:hover .finRowHead{background:#f2f9f4}
-.finRowHead small{display:block;margin-top:3px;font-size:10.5px;font-weight:600;color:#8a6510}
-.finIndent{padding-left:26px!important;font-weight:600;color:#3f4a45}
-.finSubHead{font-weight:600;color:var(--muted);font-size:12px}
-.finDeduct{color:#a1233d}
-.finEmpty{text-align:center!important;color:var(--muted);font-size:12.5px;padding:18px 14px}
-.finEmptyPad{margin:0;padding:22px}
-.finUnmapped td,.finUnmapped .finRowHead{background:#fffdf4!important}
-/* subtotal / total / group rows */
-.finSubtotalRow td,.finSubtotalRow .finRowHead{background:#f4f8f5!important;font-weight:800}
-.finGroupRow th,.finGroupRow td{background:#eef6f0!important;color:#20623b;font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:850;border-top:1px solid #d8e8de}
-.finTotalRow th,.finTotalRow td{background:#17221b!important;color:#fff;font-weight:850;font-size:14px;border-bottom:0;border-right-color:#2b3a31}
-.finGridTable tfoot tr:not(.finTotalRow) td,.finGridTable tfoot tr:not(.finTotalRow) .finRowHead{background:#f7faf8;border-bottom:0}
-.finPLTable{min-width:720px}
+.xlFrame{max-width:1440px;margin:0 auto;background:#fff;border:1px solid #c3cec7;border-radius:10px;overflow:hidden;box-shadow:0 10px 32px #16311f14}
+.xlScroll{overflow:auto;max-height:calc(100vh - 190px)}
+.xl{border-collapse:separate;border-spacing:0;width:100%;min-width:900px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.xl td,.xl th{border-right:1px solid #dfe5e1;border-bottom:1px solid #dfe5e1;padding:6px 10px;height:30px;text-align:left;white-space:nowrap;background:#fff}
+/* frozen column letters + row numbers */
+.xl thead th{position:sticky;top:0;z-index:3;background:#eef1ef;color:#6f7c74;font-size:10.5px;font-weight:800;text-align:center;letter-spacing:.06em;border-bottom:1px solid #c9d3cd}
+.xlCorner{position:sticky;left:0;z-index:4!important;width:42px;min-width:42px;background:#e6eae7!important}
+.xlRowNum{position:sticky;left:0;z-index:2;width:42px;min-width:42px;text-align:center!important;background:#f2f5f3!important;color:#93a09a;font-size:10.5px;font-weight:700;border-right:1px solid #c9d3cd}
+.xl tbody tr:hover td{background:#f6faf7}
+.xl tbody tr:hover .xlRowNum{background:#e4ece7!important;color:#4a5a51}
+/* cell kinds */
+.xlTitle{background:#17221b!important;color:#fff;font-weight:850;font-size:11px;letter-spacing:.13em;height:34px}
+.xlSubTitle{background:#f2f5f3!important;font-weight:800;font-size:11px;letter-spacing:.09em;color:#41514a;text-transform:uppercase}
+.xlHead{background:#dff2e5!important;color:#1c5f38;font-weight:850;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;text-align:center!important}
+.xlLabel{font-weight:650;color:var(--ink)}
+.xlStrong{font-weight:850}
+.xlIndent{padding-left:24px!important;font-weight:550;color:#3f4a45}
+.xlNum{text-align:right!important;font-variant-numeric:tabular-nums}
+.xlNeg{color:#a1233d}
+.xlYellow{background:#fff6d6!important;font-weight:800}
+.xlNote{color:var(--muted);font-size:11.5px;white-space:normal}
+.xlWarnCell{color:#8a6510}
+.xlUnmapped{background:#fffdf2!important;color:#8a6510}
+.xlGroup{background:#eaf4ee!important;color:#1f6039;font-weight:850;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase}
+.xlTotal,.xlTotalLabel{background:#17221b!important;color:#fff;font-weight:850;height:34px;border-right-color:#31413810;font-size:13px}
+.xlTotalLabel{letter-spacing:.02em}
+.xlSpacer td,.xlSpacer th{height:12px;background:#f2f5f3!important;border-right-color:#e9edeb}
+.xlSpacer .xlRowNum{background:#eef1ef!important}
 /* source tags */
-.finTag{display:inline-block;border-radius:99px;padding:3px 8px;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
-.finTag.tiktok{background:#e2f8e8;color:#1f6c3d}
-.finTag.manual{background:#fff5d8;color:#8a6510}
-.finTag.calc{background:#eef3f0;color:#5e6d63}
-/* inline share bar inside a cell */
-.finCellBar{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;width:150px}
-.finCellBar i{flex:1;height:6px;border-radius:99px;background:#eaefec;position:relative;max-width:96px}
-.finCellBar i.down{box-shadow:inset 0 0 0 99px #d98a7a}
-.finCellBar i.up{box-shadow:inset 0 0 0 99px #6fbf8d}
-.finCellBar em{font-style:normal;font-size:11px;color:#8d968f;width:42px;text-align:right}
-.finFootnote{margin:0;padding:14px 20px 18px;color:var(--muted);font-size:11.5px;line-height:1.65;border-top:1px solid #e0e8e3;background:#fbfcfb}
-/* editable cells */
-.finEditable input{width:100%;min-width:86px;border:1px solid transparent;border-radius:6px;padding:6px 7px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums;background:#f4f8f5;outline-color:#80bf95;color:var(--ink)}
-.finEditable input:hover{border-color:#cfe0d5}
-.finEditable input:focus{background:#fff;border-color:#80bf95}
-.finEditable td:nth-child(3) input{text-align:left}
-.finNameCell{text-align:left!important;font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis}
-.finGridTable code{font-size:11.5px;background:#f0f4f1;border-radius:5px;padding:2px 6px}
-/* cost fields */
-.finFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-bottom:1px solid #e0e8e3}
-.finFields label,.finFields .finField{padding:14px 18px;display:block;font-size:11px;font-weight:800;color:var(--muted);border-right:1px solid #eaefec;border-top:1px solid #eaefec}
-.finFields label input,.finField input{width:100%;margin-top:7px;border:1px solid #d8e3db;border-radius:8px;padding:8px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;outline-color:#80bf95}
-.finField b{display:block;margin-top:7px;font-size:17px;letter-spacing:-.04em;color:var(--ink);font-variant-numeric:tabular-nums}
-.finFieldHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.finLink{border:0;background:none;color:#2b7843;font-size:10px;font-weight:850;cursor:pointer;padding:0}
-.finFromTikTok{display:block;margin-top:2px;color:#2b7843;font-size:10px;font-weight:800}
-.finSaveRow{display:flex;align-items:center;gap:12px;padding:14px 20px}
-@media(max-width:1000px){.finBoxRow{grid-template-columns:repeat(2,1fr)}.finBox:nth-child(2){border-right:0}.finBox:nth-child(-n+2){border-bottom:1px solid #e6ece8}.finFields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.xlTag{text-align:center!important;font-size:9.5px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
+.xlTag-tiktok{background:#e2f8e8!important;color:#1f6c3d}
+.xlTag-manual{background:#fff5d8!important;color:#8a6510}
+.xlTag-calc{background:#eef3f0!important;color:#5e6d63}
+/* inline share bar */
+.xlBarCell{padding:0 10px!important}
+.xlBar{display:flex;align-items:center;gap:9px}
+.xlBar i{height:7px;border-radius:99px;min-width:2px;max-width:150px;flex:0 0 auto}
+.xlBar i.down{background:#d98a7a}
+.xlBar i.up{background:#6fbf8d}
+.xlBar em{font-style:normal;font-size:11px;color:#909a94}
+/* editable cells — inputs fill the cell like a spreadsheet */
+.xlInput{padding:0!important}
+.xlInput input{width:100%;height:29px;border:0;background:#fffdf5;padding:0 10px;font:inherit;font-size:12.5px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;outline:2px solid transparent;outline-offset:-2px}
+.xl td.xlInput:nth-of-type(4) input{text-align:left}
+.xlInput input:hover{background:#fff8e4}
+.xlInput input:focus{outline-color:#27884e;background:#fff}
+.xlSynced{display:flex;align-items:center;justify-content:flex-end;gap:7px;height:29px;padding:0 10px;background:#e9f7ee;font-weight:800}
+.xlSynced em{font-style:normal;font-size:9.5px;font-weight:850;letter-spacing:.05em;text-transform:uppercase;color:#2b7843}
+.xl code{font-size:11.5px;background:#f0f4f1;border-radius:4px;padding:1px 5px}
+.xlActionsCell{background:#f7faf8!important;white-space:normal}
+.xlActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.xlActions em{font-style:normal;color:var(--muted);font-size:12px}
+.finLink{border:0;background:none;color:#2b7843;font-size:12px;font-weight:800;cursor:pointer;padding:0}
+/* sheet tab strip */
+.xlTabs{display:flex;align-items:center;gap:12px;padding:7px 12px;border-top:1px solid #c9d3cd;background:#eef1ef}
+.xlTab{font-size:11.5px;font-weight:800;padding:5px 13px;border-radius:6px 6px 0 0;background:#fff;border:1px solid #c9d3cd;border-bottom:0;color:#2b7843;position:relative;top:1px}
+.xlTabHint{font-size:11px;color:#8b968f}
 @media(max-width:700px){
-  .finShell{padding:16px 12px}
+  .finShell{padding:12px 8px}
   .finHeader{flex-direction:column;align-items:flex-start}
-  .finBoxRow{grid-template-columns:1fr}
-  .finBox{border-right:0;border-bottom:1px solid #e6ece8}
-  .finBox:last-child{border-bottom:0}
-  .finFields{grid-template-columns:1fr}
-  .finCellBar{width:auto}.finCellBar i{display:none}
-  .finGridTable th,.finGridTable td{padding:9px 11px}
+  .xlScroll{max-height:none}
+  .xl td,.xl th{padding:5px 8px;font-size:12px}
+  .xlBar i{display:none}
+  .xlTabHint{display:none}
 }
