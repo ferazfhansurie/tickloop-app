@@ -221,3 +221,35 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .finLive.on i{background:#35ab60;box-shadow:0 0 0 3px #35ab6024;animation:finPulse 2s ease-in-out infinite}
 @keyframes finPulse{50%{box-shadow:0 0 0 6px #35ab6000}}
 .finFresh{max-width:1440px;margin:-6px auto 10px;font-size:11.5px;color:#8b968f;font-weight:650}
+
+/* --- Finance inside the app shell's middle column ------------------------
+   The standalone /finance page is a scrolling document; here the same sheet
+   lives in a fixed-height column, so the pane owns the vertical scroll and the
+   grid keeps its own horizontal scroll. */
+.paneSwitch{flex:none;display:flex;gap:6px;padding:11px 14px;border-bottom:1px solid var(--line);background:#fff}
+.paneSwitch button{border:1px solid var(--line);border-radius:8px;background:#fff;color:#4a5a51;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer}
+.paneSwitch button:hover{background:#f4f8f5}
+.paneSwitch button.on{background:var(--green);border-color:var(--green);color:#fff}
+/* The middle column is a grid item; it must be allowed to own its scrolling. */
+.inboxEmpty.financePane{padding:0;display:flex;flex-direction:column;justify-items:stretch;align-content:stretch;background:#eef2ee;min-width:0;min-height:0;overflow:hidden}
+.financePane .finPane{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:14px;background:#eef2ee}
+.finHeaderCompact{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.finPaneTitle{font-size:15px;letter-spacing:-.03em}
+.finPane .finControls{gap:6px}
+.finPane .finControls select,.finPane .finGhost,.finPane .primary,.finPane .finLive{padding:7px 10px;font-size:12px}
+/* Full-bleed inside the narrower column. */
+.finPane .finFresh,.finPane .finError,.finPane .finWarn,.finPane .finOk,.finPane .finBoxRow,.finPane .finSheet,.finPane .xlFrame{max-width:none}
+.finPane .finBoxRow{grid-template-columns:repeat(2,1fr)}
+.finPane .finBox:nth-child(-n+2){border-bottom:1px solid #e6ece8}
+.finPane .finBox:nth-child(2){border-right:0}
+/* The paneSwitch already names the view, so the inbox needs no extra chrome. */
+.inboxEmpty:not(.financePane) .paneSwitch{background:#fbfdfb}
+@media(max-width:700px){
+  /* Below 700px the columns are swappable panes sharing one grid cell. With
+     finance active it must be the visible pane and the conversation list hidden,
+     or both land in the same cell and overlap. Setup still wins when chosen. */
+  .emptyApp[data-view="finance"]:not([data-mobile="setup"]) .inboxColumn{display:none!important}
+  .emptyApp[data-view="finance"]:not([data-mobile="setup"]) .inboxEmpty{display:flex!important}
+  .financePane .finPane{padding:10px}
+  .paneSwitch{padding:9px 12px}
+}
