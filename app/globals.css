@@ -253,3 +253,10 @@ body:has(.emptyApp){overflow:hidden;height:100%}
   .financePane .finPane{padding:10px}
   .paneSwitch{padding:9px 12px}
 }
+
+/* Finance owns the full width: the conversation list is inbox chrome, and the
+   sheet needs those 330px — at the 4-column width it was clipped mid-grid. */
+.emptyApp[data-view="finance"]{grid-template-columns:74px minmax(0,1fr) 320px}
+.emptyApp[data-view="finance"] .inboxColumn{display:none}
+@media(max-width:900px){.emptyApp[data-view="finance"]{grid-template-columns:64px minmax(0,1fr)}}
+@media(max-width:700px){.emptyApp[data-view="finance"]{grid-template-columns:minmax(0,1fr)}}
