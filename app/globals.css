@@ -307,3 +307,64 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .costFieldHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 @media(max-width:1000px){.costFields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.costFields{grid-template-columns:1fr;padding:0 14px 14px}.costPanelHead{padding:14px}.costSubhead,.costNote{margin-left:14px;margin-right:14px}}
+
+/* --- Date-range chips ---------------------------------------------------- */
+.rangeChips{display:inline-flex;gap:2px;padding:3px;background:#e7ede9;border-radius:10px}
+.rangeChips button{border:0;background:transparent;color:#5b6a62;padding:6px 11px;font-size:12px;font-weight:800;border-radius:8px;cursor:pointer}
+.rangeChips button:hover{color:var(--ink)}
+.rangeChips button.on{background:#fff;color:#1b6b3c;box-shadow:0 1px 3px #16311f1f}
+
+/* --- Mobile stacked cards ------------------------------------------------
+   A 7-column sheet cannot be read at 390px, so phones get the same figures as
+   stacked cards. Only one of the two is ever in the layout. */
+.mStack{display:none}
+.mKpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.mKpis article{background:#fff;border:1px solid #d3dfd7;border-radius:13px;padding:12px;display:grid;gap:3px;min-width:0}
+.mKpis span{font-size:10.5px;color:var(--muted);font-weight:750}
+.mKpis b{font-size:19px;letter-spacing:-.05em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.mKpis small{font-size:10px;color:var(--muted)}
+.mKpis .good b{color:#1c6f3c}
+.mKpis .bad b{color:#a1233d}
+.mCard{background:#fff;border:1px solid #d3dfd7;border-radius:14px;padding:14px;margin-bottom:10px}
+.mEyebrow{margin:0 0 10px;font-size:10px;font-weight:850;letter-spacing:.1em;text-transform:uppercase;color:#2b7843}
+.mRow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #eef1ef}
+.mRow>span{font-size:13px;color:#3f4a45;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.mRow>b{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mRow.strong>span,.mRow.strong>b{font-weight:850;color:var(--ink)}
+.mRow i.finTag{font-style:normal}
+.mRow b.neg,.mLine b.neg,.mTotal b.neg{color:#a1233d}
+.mTotal{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:10px;padding-top:12px;border-top:2px solid #dfe7e1}
+.mTotal span{font-size:13px;font-weight:850}
+.mTotal b{font-size:19px;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.mEmpty{margin:0;color:var(--muted);font-size:12.5px}
+.mBundle{padding:10px 0;border-bottom:1px solid #eef1ef}
+.mBundle.unmapped .mBundleFoot{color:#8a6510}
+.mBundleTop{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.mBundleTop b{font-size:13.5px}
+.mBundleTop span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mBundleFoot{margin-top:3px;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mGroup{margin-bottom:12px}
+.mGroupHead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding-bottom:6px;border-bottom:1px solid #e3ebe6;margin-bottom:4px}
+.mGroupHead span{font-size:10px;font-weight:850;letter-spacing:.1em;text-transform:uppercase;color:#2b7843}
+.mGroupHead b{font-size:13px;font-variant-numeric:tabular-nums}
+.mLine{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:5px 0}
+.mLine span{font-size:12.5px;color:#4a5a51;min-width:0}
+.mLine b{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* --- Bottom tab bar (mobile only) ---------------------------------------- */
+.tabBar{display:none}
+@media(max-width:700px){
+  /* Cards replace the sheet; the sheet's horizontal scroll is not a phone UI. */
+  .mStack{display:block}
+  .xlFrame{display:none}
+  .finPane .finFresh{margin-bottom:8px}
+  /* The pane switch is redundant once the tab bar exists. */
+  .paneSwitch{display:none}
+  /* Room for the floating bar, which is fixed and so out of the grid flow. */
+  .financePane .finPane,.setupPanel,.conversationList{padding-bottom:84px}
+  .tabBar{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;position:fixed;left:12px;right:12px;bottom:12px;z-index:30;padding:6px;background:#17221bF2;backdrop-filter:blur(10px);border-radius:16px;box-shadow:0 10px 30px #0b17103d}
+  .tabBar button{display:grid;justify-items:center;gap:3px;border:0;background:transparent;color:#9fb1a6;padding:8px 4px;border-radius:12px;font-size:11px;font-weight:800;cursor:pointer}
+  .tabBar button.on{background:#24382c;color:#7fe0a3}
+  .tabBar svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .tabBar button.on svg{stroke:#7fe0a3}
+}

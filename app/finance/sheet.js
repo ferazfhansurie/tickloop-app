@@ -34,6 +34,30 @@ function monthRange(period) {
   return { from: new Date(Date.UTC(year, month - 1, 1)).toISOString(), to: new Date(Date.UTC(year, month, 1)).toISOString() };
 }
 
+/** Quick ranges. `month` defers to the month picker; the rest are rolling windows. */
+const RANGES = [
+  { key: "today", label: "today", days: 1 },
+  { key: "7d", label: "7d", days: 7 },
+  { key: "30d", label: "30d", days: 30 },
+  { key: "month", label: "month" },
+  { key: "all", label: "all", days: 365 },
+];
+
+function rangeFor(rangeKey, period) {
+  if (rangeKey === "month") return monthRange(period);
+  const days = RANGES.find((entry) => entry.key === rangeKey)?.days ?? 30;
+  const now = new Date();
+  // Whole days in UTC so a range never lands mid-day and splits an order's date.
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const start = new Date(end.getTime() - days * 86400000);
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function rangeLabel(rangeKey, period) {
+  if (rangeKey === "month") return new Date(`${period}-01T00:00:00Z`).toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
+  return { today: "Today", "7d": "Last 7 days", "30d": "Last 30 days", all: "Last 12 months" }[rangeKey] || rangeKey;
+}
+
 /** "synced 4m ago" — tick is unused but forces a re-render so the label ages. */
 function freshness(lastSynced) {
   if (!lastSynced) return "Never synced";
@@ -57,6 +81,7 @@ const spacer = () => [];
 export function FinanceSheet({ compact = false }) {
   const months = useMemo(monthOptions, []);
   const [period, setPeriod] = useState(months[0].value);
+  const [rangeKey, setRangeKey] = useState("month");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -83,7 +108,7 @@ export function FinanceSheet({ compact = false }) {
 
   const load = useCallback(
     async (sync) => {
-      const { from, to } = monthRange(period);
+      const { from, to } = rangeFor(rangeKey, period);
       if (sync) setSyncing(true); else setLoading(true);
       setError("");
       try {
@@ -104,7 +129,7 @@ export function FinanceSheet({ compact = false }) {
         setLoading(false);
       }
     },
-    [period],
+    [rangeKey, period],
   );
 
   useEffect(() => { load(false); }, [load]);
@@ -327,9 +352,24 @@ export function FinanceSheet({ compact = false }) {
           </div>
         )}
         <div className="finControls">
-          <select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="Month">
-            {months.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
-          </select>
+          <div className="rangeChips" role="tablist" aria-label="Date range">
+            {RANGES.map((entry) => (
+              <button
+                key={entry.key}
+                role="tab"
+                aria-selected={rangeKey === entry.key}
+                className={rangeKey === entry.key ? "on" : ""}
+                onClick={() => setRangeKey(entry.key)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+          {rangeKey === "month" && (
+            <select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="Month">
+              {months.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
+            </select>
+          )}
           <button className="finGhost" onClick={() => setShowCosts((open) => !open)}>{showCosts ? "Hide cost setup" : "Cost setup"}</button>
           <button className={`finLive${live ? " on" : ""}`} onClick={() => setLive((value) => !value)} title="Re-read every 30s">
             <i />{live ? "Live" : "Paused"}
@@ -439,6 +479,70 @@ export function FinanceSheet({ compact = false }) {
           </section>
         )}
 
+        {/* Mobile: the 7-column grid is unusable at 390px, so the same numbers are
+            stacked as cards. Desktop hides this and shows the sheet instead. */}
+        <div className="mStack">
+          <div className="mKpis">
+            <article><span>Total Sales</span><b>{money(data.totalSales)}</b><small>{data.orderCount} orders</small></article>
+            <article><span>Duit Masuk</span><b>{money(data.duitMasuk)}</b><small>{data.settledOrders} of {data.orderCount} settled</small></article>
+            <article className={data.nettProfit < 0 ? "bad" : "good"}><span>Nett Profit</span><b>{money(data.nettProfit)}</b><small>{(data.profitPercentage * 100).toFixed(2)}% of settled sales</small></article>
+            <article><span>Unit ME</span><b>{data.unitMe.toLocaleString()}</b><small>{data.totalQuantity.toLocaleString()} units sold</small></article>
+          </div>
+
+          <section className="mCard">
+            <p className="mEyebrow">// profit &amp; loss</p>
+            <MRow label="Total Sales (Order Amount)" value={money(data.totalSales)} source="tiktok" />
+            {data.pendingSales > 0 && <MRow label="Less: not yet settled" value={money(-data.pendingSales)} source="tiktok" deduct />}
+            <MRow label="Settled sales" value={money(data.settledSales)} source="tiktok" strong />
+            <MRow label="Duit Masuk" value={money(data.duitMasuk)} source="tiktok" strong />
+            <MRow label="Kos Produk" value={money(-data.kosProdukSettled)} source="manual" deduct />
+            <MRow label="Kos Ads By Card" value={money(-data.adsCard)} source="manual" deduct />
+            <MRow label="Kos Ads By GMV Pay" value={money(data.adsGmvPay)} source={data.adsGmvPayIsOverride ? "manual" : "tiktok"} />
+            <MRow label="Ad Credit" value={money(data.adCredit)} source="manual" />
+            {data.otherCost !== 0 && <MRow label="Other cost" value={money(-data.otherCost)} source="manual" deduct />}
+            <MRow label={`WHT ${(data.whtRate * 100).toFixed(0)}%`} value={money(-data.wht)} source="calc" deduct />
+            <div className="mTotal"><span>Nett Profit</span><b className={data.nettProfit < 0 ? "neg" : ""}>{money(data.nettProfit)}</b></div>
+          </section>
+
+          <section className="mCard">
+            <p className="mEyebrow">// quantity by bundle</p>
+            {data.bundles.length === 0 && <p className="mEmpty">No orders in this range yet.</p>}
+            {data.bundles.map((bundle) => (
+              <div key={bundle.bundle} className={`mBundle${bundle.matched ? "" : " unmapped"}`}>
+                <div className="mBundleTop"><b>{bundle.bundle}</b><span>{bundle.quantity.toLocaleString()} sold</span></div>
+                <div className="mBundleFoot">
+                  {bundle.matched
+                    ? <>{money(bundle.unitCost)} each · {(bundle.bottles * bundle.quantity).toLocaleString()} bottles · {money(bundle.totalCost)}</>
+                    : <>no cost mapped</>}
+                </div>
+              </div>
+            ))}
+          </section>
+
+          {data.lines.length > 0 && (
+            <section className="mCard">
+              <p className="mEyebrow">// settlement breakdown</p>
+              {GROUP_ORDER.map((group) => {
+                const lines = data.lines.filter((line) => line.group === group);
+                if (!lines.length) return null;
+                const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+                return (
+                  <div key={group} className="mGroup">
+                    <div className="mGroupHead"><span>{GROUP_LABELS[group]}</span><b>{money(subtotal)}</b></div>
+                    {lines.map((line) => (
+                      <div key={`${line.group}:${line.key}`} className="mLine">
+                        <span>{line.label}</span>
+                        <b className={line.amount < 0 ? "neg" : ""}>{money(line.amount)}</b>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              <div className="mTotal"><span>Duit Masuk</span><b>{money(data.duitMasuk)}</b></div>
+            </section>
+          )}
+        </div>
+
         <div className="xlFrame">
           <div className="xlScroll">
             <table className="xl">
@@ -458,11 +562,20 @@ export function FinanceSheet({ compact = false }) {
               </tbody>
             </table>
           </div>
-          <div className="xlTabs"><span className="xlTab on">{period}</span><span className="xlTabHint">Values marked TikTok are measured; Manual are entered by you.</span></div>
+          <div className="xlTabs"><span className="xlTab on">{rangeLabel(rangeKey, period)}</span><span className="xlTabHint">Values marked TikTok are measured; Manual are entered by you.</span></div>
         </div>
         </>
       )}
     </main>
+  );
+}
+
+function MRow({ label, value, source, deduct, strong }) {
+  return (
+    <div className={`mRow${strong ? " strong" : ""}`}>
+      <span>{label}<i className={`finTag ${source}`}>{SOURCE_LABEL[source]}</i></span>
+      <b className={deduct ? "neg" : ""}>{value}</b>
+    </div>
   );
 }
 
