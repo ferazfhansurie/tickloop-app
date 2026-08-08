@@ -399,12 +399,19 @@ export function FinanceSheet({ compact = false }) {
           <button className={`finLive${live ? " on" : ""}`} onClick={() => setLive((value) => !value)} title="Re-read every 30s">
             <i />{live ? "Live" : "Paused"}
           </button>
-          <button className="primary" onClick={() => load(true)} disabled={syncing}>{syncing ? "Syncing…" : "Sync TikTok"}</button>
+          <button
+            className="finGhost"
+            onClick={() => load(true)}
+            disabled={syncing}
+            title="Not required — the hourly job keeps this current. Use this for a deep 90-day backfill or to refresh immediately."
+          >
+            {syncing ? "Syncing…" : "Sync now"}
+          </button>
           {!compact && <a className="finBack" href="/">Back</a>}
         </div>
       </header>
 
-      {data && <p className="finFresh">{freshness(data.lastSynced, tick)}{!live ? " · live paused" : showCosts ? " · live paused while editing costs" : " · live, re-reading every 30s"}</p>}
+      {data && <p className="finFresh">{freshness(data.lastSynced, tick)}{!live ? " · live paused" : showCosts ? " · live paused while editing costs" : " · auto-syncs hourly, page re-reads every 30s"}</p>}
       {error && <p className="finError">{error}</p>}
       {data?.sync?.errors?.length > 0 && data.sync.errors.map((message) => <p key={message} className="finWarn">{message}</p>)}
       {data?.sync && !data.sync.errors.length && (
