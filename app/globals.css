@@ -469,3 +469,33 @@ body{background:var(--bg);color:var(--text)}
   .readyCard p,.setupLine b{font-size:15px}
   .testOrderButton,.connectButton{font-size:15px;padding:13px}
 }
+
+/* --- Dark-mode gaps found on device -------------------------------------- */
+/* The pane title had no colour of its own, so it inherited near-black and
+   vanished against the dark background. */
+.finPaneTitle,.finHeader h1{color:var(--text)}
+/* The mobile header was still hardcoded white, leaving a bright band above a
+   dark app. */
+.mobileHeader{background:var(--surface);border-color:var(--border)}
+.mobileHeader button{background:var(--surface);border-color:var(--border);color:var(--text)}
+.mobileHeader b{color:var(--text)}
+/* Live read as a light pill floating in a dark toolbar. */
+.finLive{background:var(--surface);border-color:var(--border);color:var(--text-dim)}
+.finLive.on{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-text)}
+.rangeChips button.on{background:var(--surface);color:var(--accent-text)}
+.splash{background:var(--bg);color:var(--text)}
+.notice{background:var(--bar);color:var(--bar-text)}
+.xlSpacer td,.xlSpacer th{background:var(--bg)}
+
+/* --- Clearance for the floating tab bar ----------------------------------
+   84px was measured against the old smaller type; with the larger labels the bar
+   is ~70px tall, sits 12px up, and iOS adds its own inset — so the last KPI card
+   was sliding underneath it. */
+@media(max-width:700px){
+  .tabBar{bottom:calc(12px + env(safe-area-inset-bottom))}
+  .financePane .finPane,.conversationList,.inboxEmpty{padding-bottom:calc(108px + env(safe-area-inset-bottom))}
+  .profileSheet{bottom:calc(96px + env(safe-area-inset-bottom))}
+  /* Tighter toolbar so the controls stop taking three rows before any data. */
+  .finHeaderCompact{gap:8px;margin-bottom:10px}
+  .finPane .finControls{gap:6px}
+}
