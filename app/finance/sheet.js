@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTheme } from "../theme";
 
 /**
  * Rendered as an actual spreadsheet — lettered columns, numbered rows, a uniform
@@ -82,6 +83,8 @@ export function FinanceSheet({ compact = false }) {
   const months = useMemo(monthOptions, []);
   const [period, setPeriod] = useState(months[0].value);
   const [rangeKey, setRangeKey] = useState("month");
+  // Applies the stored theme so the standalone /finance page matches the app.
+  useTheme();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
