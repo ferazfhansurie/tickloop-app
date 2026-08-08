@@ -161,7 +161,6 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .xl tbody tr:hover .xlRowNum{background:#e4ece7!important;color:#4a5a51}
 /* cell kinds */
 .xlTitle{background:#17221b!important;color:#fff;font-weight:850;font-size:11px;letter-spacing:.13em;height:34px}
-.xlSubTitle{background:#f2f5f3!important;font-weight:800;font-size:11px;letter-spacing:.09em;color:#41514a;text-transform:uppercase}
 .xlHead{background:#dff2e5!important;color:#1c5f38;font-weight:850;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;text-align:center!important}
 .xlLabel{font-weight:650;color:var(--ink)}
 .xlStrong{font-weight:850}
@@ -190,16 +189,7 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 .xlBar i.up{background:#6fbf8d}
 .xlBar em{font-style:normal;font-size:11px;color:#909a94}
 /* editable cells — inputs fill the cell like a spreadsheet */
-.xlInput{padding:0!important}
-.xlInput input{width:100%;height:29px;border:0;background:#fffdf5;padding:0 10px;font:inherit;font-size:12.5px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;outline:2px solid transparent;outline-offset:-2px}
-.xl td.xlInput:nth-of-type(4) input{text-align:left}
-.xlInput input:hover{background:#fff8e4}
-.xlInput input:focus{outline-color:#27884e;background:#fff}
-.xlSynced{display:flex;align-items:center;justify-content:flex-end;gap:7px;height:29px;padding:0 10px;background:#e9f7ee;font-weight:800}
-.xlSynced em{font-style:normal;font-size:9.5px;font-weight:850;letter-spacing:.05em;text-transform:uppercase;color:#2b7843}
 .xl code{font-size:11.5px;background:#f0f4f1;border-radius:4px;padding:1px 5px}
-.xlActionsCell{background:#f7faf8!important;white-space:normal}
-.xlActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .xlActions em{font-style:normal;color:var(--muted);font-size:12px}
 .finLink{border:0;background:none;color:#2b7843;font-size:12px;font-weight:800;cursor:pointer;padding:0}
 /* sheet tab strip */
@@ -284,3 +274,36 @@ body:has(.emptyApp){overflow:hidden;height:100%}
 /* Below 900px the setup column is already hidden and the mobile header owns the
    Setup tab, so this toggle would be a no-op. */
 @media(max-width:900px){.paneSetup{display:none}}
+
+/* --- Cost setup panel ----------------------------------------------------
+   Lives above the sheet rather than as blocks inside the grid: entering costs
+   is a form, and burying editable cells among read-only figures made it unclear
+   which numbers were yours to change. */
+.costPanel{max-width:none;margin:0 0 14px;background:#fff;border:1px solid #d3dfd7;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px #16311f0d}
+.costPanelHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid #e0e8e3;background:linear-gradient(#fbfdfb,#f5f9f6)}
+.costPanelHead h2{margin:0;font-size:17px;letter-spacing:-.04em}
+.costPanelHead p{margin:5px 0 0;max-width:70ch;color:var(--muted);font-size:12px;line-height:1.5}
+.costPanelActions{display:flex;align-items:center;gap:10px;flex:none}
+.costClose{border:1px solid var(--line);border-radius:8px;background:#fff;color:#7a857f;width:30px;height:30px;font-size:12px;line-height:1;cursor:pointer}
+.costClose:hover{background:#f4f8f5;color:var(--ink)}
+.costScroll{overflow-x:auto}
+.costTable{border-collapse:separate;border-spacing:0;width:100%;min-width:640px}
+.costTable th,.costTable td{padding:9px 12px;font-size:13px;text-align:left;border-bottom:1px solid #eaefec;white-space:nowrap}
+.costTable thead th{background:#f7faf8;color:#718076;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:850}
+.costTable tbody th{font-weight:700}
+.costTable code{font-size:11.5px;background:#f0f4f1;border-radius:5px;padding:2px 6px}
+.costName{color:var(--muted);font-size:12px;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.costSold{text-align:right;font-variant-numeric:tabular-nums}
+.costTable input{width:100%;min-width:96px;border:1px solid #d8e3db;border-radius:7px;padding:7px 8px;font-size:13px;outline-color:#80bf95;background:#fff}
+.costTable td:nth-child(4) input,.costTable td:nth-child(5) input{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.costTable input:focus{border-color:#80bf95}
+.costEmpty{color:var(--muted);text-align:center!important}
+.costSubhead{margin:16px 18px 2px;font-size:13px;letter-spacing:-.02em}
+.costNote{margin:0 18px 12px;font-size:11.5px;line-height:1.5;max-width:80ch}
+.costFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:0 18px 18px}
+.costFields label,.costFields .costField{border:1px solid #e1e7e3;border-radius:12px;padding:11px 12px;display:block;font-size:11px;font-weight:800;color:var(--muted)}
+.costFields input{width:100%;margin-top:6px;border:1px solid #d8e3db;border-radius:8px;padding:8px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;outline-color:#80bf95}
+.costField b{display:block;margin-top:6px;font-size:16px;letter-spacing:-.04em;color:var(--ink);font-variant-numeric:tabular-nums}
+.costFieldHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+@media(max-width:1000px){.costFields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.costFields{grid-template-columns:1fr;padding:0 14px 14px}.costPanelHead{padding:14px}.costSubhead,.costNote{margin-left:14px;margin-right:14px}}

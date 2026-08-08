@@ -310,73 +310,8 @@ export function FinanceSheet({ compact = false }) {
       }
     }
 
-    /* ---- cost setup block ---- */
-    if (showCosts) {
-      out.push(spacer());
-      out.push(title("COST SETUP — the only numbers TikTok cannot supply"));
-      out.push([
-        cell("SKU", { className: "xlHead" }),
-        cell("TikTok name", { className: "xlHead", span: 2 }),
-        cell("Bundle name", { className: "xlHead" }),
-        cell("Unit Cost", { className: "xlHead" }),
-        cell("Bottles", { className: "xlHead" }),
-        cell("Sold", { className: "xlHead" }),
-      ]);
-      if (!products.length) out.push([cell("No SKUs yet — hit Sync TikTok first.", { className: "xlNote", span: COLUMNS.length })]);
-      products.forEach((product, index) => {
-        out.push([
-          cell(<code>{product.skuKey}</code>, { className: "xlLabel" }),
-          cell(product.label, { className: "xlNote", span: 2 }),
-          cell(<input value={product.bundle} onChange={(event) => updateProduct(index, { bundle: event.target.value })} />, { className: "xlInput" }),
-          cell(<input type="number" step="0.01" value={product.unitCost} onChange={(event) => updateProduct(index, { unitCost: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
-          cell(<input type="number" step="1" value={product.bottles} onChange={(event) => updateProduct(index, { bottles: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
-          cell(product.quantity.toLocaleString(), { className: "xlNum" }),
-        ]);
-      });
-
-      const syncedGmvPay = data.adsGmvPayIsOverride ? 0 : data.adsGmvPay;
-      const effectiveGmvPay = periodCost.adsGmvPayOverride ?? syncedGmvPay;
-      out.push(spacer());
-      out.push([
-        cell(`Ad spend & tax — ${period}`, { className: "xlSubTitle", span: COLUMNS.length }),
-      ]);
-      out.push([
-        cell("Kos Ads By Card", { className: "xlHead" }),
-        cell("Kos Ads By GMV Pay", { className: "xlHead" }),
-        cell("Ad Credit", { className: "xlHead" }),
-        cell("Other cost", { className: "xlHead" }),
-        cell("WHT rate %", { className: "xlHead" }),
-        cell("WHT to pay", { className: "xlHead", span: 2 }),
-      ]);
-      out.push([
-        cell(<input type="number" step="0.01" value={periodCost.adsCard} onChange={(event) => setPeriodCost({ ...periodCost, adsCard: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
-        cell(
-          periodCost.adsGmvPayOverride === null
-            ? <span className="xlSynced">{money(syncedGmvPay)}<em>synced</em></span>
-            : <input type="number" step="0.01" value={periodCost.adsGmvPayOverride} onChange={(event) => setPeriodCost({ ...periodCost, adsGmvPayOverride: Number(event.target.value) })} />,
-          { className: "xlInput xlNum" },
-        ),
-        cell(<input type="number" step="0.01" value={periodCost.adCredit} onChange={(event) => setPeriodCost({ ...periodCost, adCredit: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
-        cell(<input type="number" step="0.01" value={periodCost.otherCost} onChange={(event) => setPeriodCost({ ...periodCost, otherCost: Number(event.target.value) })} />, { className: "xlInput xlNum" }),
-        cell(<input type="number" step="0.1" value={(periodCost.whtRate * 100).toFixed(1)} onChange={(event) => setPeriodCost({ ...periodCost, whtRate: Number(event.target.value) / 100 })} />, { className: "xlInput xlNum" }),
-        cell(money(periodCost.whtRate * (periodCost.adsCard + effectiveGmvPay)), { className: "xlNum xlYellow", span: 2 }),
-      ]);
-      out.push([
-        cell(
-          <span className="xlActions">
-            <button className="primary" onClick={saveCosts} disabled={saving}>{saving ? "Saving…" : "Save cost setup"}</button>
-            <button className="finLink" onClick={() => setPeriodCost({ ...periodCost, adsGmvPayOverride: periodCost.adsGmvPayOverride === null ? Number((data.adsGmvPayIsOverride ? 0 : data.adsGmvPay).toFixed(2)) : null })}>
-              {periodCost.adsGmvPayOverride === null ? "Override GMV Pay" : "Use synced GMV Pay"}
-            </button>
-            {saveMessage && <em>{saveMessage}</em>}
-          </span>,
-          { span: COLUMNS.length, className: "xlActionsCell" },
-        ),
-      ]);
-    }
-
     return out;
-  }, [data, money, showCosts, products, periodCost, saving, saveMessage, period]);
+  }, [data, money]);
 
   const settledPercent = data && data.orderCount > 0 ? (data.settledOrders / data.orderCount) * 100 : 0;
 
@@ -445,6 +380,65 @@ export function FinanceSheet({ compact = false }) {
       {loading && !data && <p className="finMuted">Loading…</p>}
 
       {data && (
+        <>
+        {showCosts && (
+          <section className="costPanel">
+            <div className="costPanelHead">
+              <div>
+                <h2>Cost setup</h2>
+                <p>The only numbers TikTok Shop cannot supply: what each bundle costs to make, and ad spend billed to a card in Ads Manager.</p>
+              </div>
+              <div className="costPanelActions">
+                <button className="primary" onClick={saveCosts} disabled={saving}>{saving ? "Saving…" : "Save cost setup"}</button>
+                {saveMessage && <span className="finMuted">{saveMessage}</span>}
+                <button className="costClose" onClick={() => setShowCosts(false)} title="Close">✕</button>
+              </div>
+            </div>
+
+            <div className="costScroll">
+              <table className="costTable">
+                <thead>
+                  <tr><th>SKU</th><th>TikTok name</th><th>Bundle name</th><th>Unit cost</th><th>Bottles</th><th>Sold</th></tr>
+                </thead>
+                <tbody>
+                  {products.length === 0 && <tr><td colSpan={6} className="costEmpty">No SKUs yet — hit Sync now first.</td></tr>}
+                  {products.map((product, index) => (
+                    <tr key={product.skuKey}>
+                      <th><code>{product.skuKey}</code></th>
+                      <td className="costName">{product.label}</td>
+                      <td><input value={product.bundle} onChange={(event) => updateProduct(index, { bundle: event.target.value })} /></td>
+                      <td><input type="number" step="0.01" value={product.unitCost} onChange={(event) => updateProduct(index, { unitCost: Number(event.target.value) })} /></td>
+                      <td><input type="number" step="1" value={product.bottles} onChange={(event) => updateProduct(index, { bottles: Number(event.target.value) })} /></td>
+                      <td className="costSold">{product.quantity.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="costSubhead">Ad spend &amp; tax — {period}</h3>
+            <p className="finMuted costNote">GMV Pay syncs from TikTok&apos;s GMV Max ad fee. Card-billed spend and ad credits live in TikTok Ads Manager, which a TikTok Shop authorization cannot reach.</p>
+            <div className="costFields">
+              <label>Kos Ads By Card<input type="number" step="0.01" value={periodCost.adsCard} onChange={(event) => setPeriodCost({ ...periodCost, adsCard: Number(event.target.value) })} /></label>
+              <div className="costField">
+                <div className="costFieldHead">
+                  <span>Kos Ads By GMV Pay</span>
+                  <button className="finLink" onClick={() => setPeriodCost({ ...periodCost, adsGmvPayOverride: periodCost.adsGmvPayOverride === null ? Number((data.adsGmvPayIsOverride ? 0 : data.adsGmvPay).toFixed(2)) : null })}>
+                    {periodCost.adsGmvPayOverride === null ? "Override" : "Use synced"}
+                  </button>
+                </div>
+                {periodCost.adsGmvPayOverride === null
+                  ? <><b>{money(data.adsGmvPayIsOverride ? 0 : data.adsGmvPay)}</b><small className="finFromTikTok">Synced from TikTok</small></>
+                  : <input type="number" step="0.01" value={periodCost.adsGmvPayOverride} onChange={(event) => setPeriodCost({ ...periodCost, adsGmvPayOverride: Number(event.target.value) })} />}
+              </div>
+              <label>Ad Credit<input type="number" step="0.01" value={periodCost.adCredit} onChange={(event) => setPeriodCost({ ...periodCost, adCredit: Number(event.target.value) })} /></label>
+              <label>Other cost<input type="number" step="0.01" value={periodCost.otherCost} onChange={(event) => setPeriodCost({ ...periodCost, otherCost: Number(event.target.value) })} /></label>
+              <label>WHT rate (%)<input type="number" step="0.1" value={(periodCost.whtRate * 100).toFixed(1)} onChange={(event) => setPeriodCost({ ...periodCost, whtRate: Number(event.target.value) / 100 })} /></label>
+              <div className="costField"><span>WHT to pay</span><b>{money(periodCost.whtRate * (periodCost.adsCard + (periodCost.adsGmvPayOverride ?? (data.adsGmvPayIsOverride ? 0 : data.adsGmvPay))))}</b></div>
+            </div>
+          </section>
+        )}
+
         <div className="xlFrame">
           <div className="xlScroll">
             <table className="xl">
@@ -466,6 +460,7 @@ export function FinanceSheet({ compact = false }) {
           </div>
           <div className="xlTabs"><span className="xlTab on">{period}</span><span className="xlTabHint">Values marked TikTok are measured; Manual are entered by you.</span></div>
         </div>
+        </>
       )}
     </main>
   );
