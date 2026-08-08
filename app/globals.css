@@ -499,3 +499,24 @@ body{background:var(--bg);color:var(--text)}
   .finHeaderCompact{gap:8px;margin-bottom:10px}
   .finPane .finControls{gap:6px}
 }
+
+/* Specificity, not a missing token: `.financePane .finPane` is two classes and
+   outranked the single-class token rule above, so the pane kept its light
+   background while everything around it went dark. Matching the original
+   selectors exactly lets source order decide. */
+.financePane .finPane{background:var(--bg)}
+.inboxEmpty.financePane{background:var(--bg)}
+.inboxEmpty{background:var(--surface-2)}
+.bubble.in{background:var(--surface)}
+.thread{background:var(--surface-3)}
+.threadHeader,.composer{background:var(--surface);border-color:var(--border)}
+.composerInput{background:var(--surface);color:var(--text);border-color:var(--border)}
+.dayDivider span{background:var(--surface);color:var(--text-dim)}
+.bubbleText{color:var(--text)}
+.mobileConnect.secondary{background:var(--surface);color:var(--accent-text)}
+.readyMark{background:var(--accent-soft);color:var(--accent-text)}
+.setupLine{border-color:var(--border)}
+.setupLine span{border-color:var(--border);color:var(--text-dim)}
+.setupLine small,.readyCard>p:not(.eyebrow),.testNote,.syncHint{color:var(--text-dim)}
+.connectionCard{background:var(--surface-2);border-color:var(--border)}
+.connectionCard p{color:var(--text-dim)}
