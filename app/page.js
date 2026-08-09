@@ -117,6 +117,49 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [workspace, setWorkspace] = useState(null);
   const [notice, setNotice] = useState("");
+
+  // OAuth callbacks come back as ?tiktok=… / ?business=…. Without this the page
+  // just appeared to reload: the reason was in the URL and nothing read it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get("reason");
+    const messages = {
+      business: {
+        connected: "TikTok Business Center connected. Ad spend will sync shortly.",
+        not_configured: "Business Center is not configured on the server yet — TIKTOK_BUSINESS_APP_ID and TIKTOK_BUSINESS_SECRET are missing in Vercel.",
+        signin: "Sign in before connecting Business Center.",
+        invalid_state: "That authorization link expired. Try connecting again.",
+        cancelled: "Business Center authorization was cancelled.",
+        token_error: `TikTok rejected the Business Center authorization${reason ? `: ${reason}` : "."}`,
+        error: `Business Center failed${reason ? `: ${reason}` : "."}`,
+      },
+      tiktok: {
+        connected: "TikTok Shop connected.",
+        cancelled: "TikTok Shop authorization was cancelled.",
+        invalid_state: "That authorization link expired. Try connecting again.",
+        not_configured: "TikTok Shop credentials are not configured on the server.",
+        token_error: `TikTok rejected the authorization${reason ? `: ${reason}` : "."}`,
+        error: `TikTok Shop failed${reason ? `: ${reason}` : "."}`,
+      },
+    };
+    for (const key of ["business", "tiktok"]) {
+      const value = params.get(key);
+      if (!value) continue;
+      setNotice(messages[key][value] || `${key}: ${value}`);
+      // A first connect has nothing stored yet, so pull immediately rather than
+      // leaving the seller staring at zeros until the hourly job runs.
+      if (key === "business" && value === "connected") {
+        fetch("/api/business/sync", { method: "POST" })
+          .then(response => response.json())
+          .then(payload => setNotice(payload.error ? `Ad sync: ${payload.error}` : `Synced ${payload.saved || 0} ad transactions.`))
+          .catch(() => {});
+      }
+      break;
+    }
+    if (params.get("business") || params.get("tiktok")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [creatingTestOrder, setCreatingTestOrder] = useState(false);
