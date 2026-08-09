@@ -249,7 +249,16 @@ export function FinanceSheet({ compact = false }) {
     plRow("Duit Masuk (Total settlement)", data.duitMasuk, "tiktok", `${(data.settlementRate * 100).toFixed(1)}% of settled sales`, { strong: true, fill: "Yellow" });
     plRow("Kos Produk", -data.kosProdukSettled, "manual", "settled orders only", { negative: true, fill: "Yellow" });
     plRow("Kos Ads By Card", -data.adsCard, "manual", "Ads Manager, whole month", { negative: true });
-    plRow("Kos Ads By GMV Pay", data.adsGmvPay, data.adsGmvPayIsOverride ? "manual" : "tiktok", "already inside settlement — not deducted twice");
+    plRow(
+      data.adsGmvPayIsOverride || data.adFeeSources?.length ? "Ads charged inside settlement" : "Kos Ads By GMV Pay",
+      data.adsGmvPay,
+      data.adsGmvPayIsOverride ? "manual" : "tiktok",
+      data.adsGmvPayIsOverride
+        ? "manual override — already inside settlement"
+        : data.adFeeSources?.length
+          ? `${data.adFeeSources.join(", ")} — already deducted, not GMV Pay top-ups`
+          : "no ad fees found in settlement",
+    );
     plRow("Ad Credit", data.adCredit, "manual", "not netted off profit");
     if (data.otherCost !== 0) plRow("Other cost", -data.otherCost, "manual", "whole month", { negative: true });
     plRow(`WHT ${(data.whtRate * 100).toFixed(0)}% (To Pay)`, -data.wht, "calc", "on card + GMV Pay ad spend", { negative: true, fill: "Yellow" });
@@ -500,7 +509,7 @@ export function FinanceSheet({ compact = false }) {
             <MRow label="Duit Masuk" value={money(data.duitMasuk)} source="tiktok" strong />
             <MRow label="Kos Produk" value={money(-data.kosProdukSettled)} source="manual" deduct />
             <MRow label="Kos Ads By Card" value={money(-data.adsCard)} source="manual" deduct />
-            <MRow label="Kos Ads By GMV Pay" value={money(data.adsGmvPay)} source={data.adsGmvPayIsOverride ? "manual" : "tiktok"} />
+            <MRow label={data.adFeeSources?.length ? "Ads inside settlement" : "Kos Ads By GMV Pay"} value={money(data.adsGmvPay)} source={data.adsGmvPayIsOverride ? "manual" : "tiktok"} />
             <MRow label="Ad Credit" value={money(data.adCredit)} source="manual" />
             {data.otherCost !== 0 && <MRow label="Other cost" value={money(-data.otherCost)} source="manual" deduct />}
             <MRow label={`WHT ${(data.whtRate * 100).toFixed(0)}%`} value={money(-data.wht)} source="calc" deduct />
