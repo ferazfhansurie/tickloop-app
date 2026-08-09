@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { database, ensureSchema } from "../../../../lib/db";
-import { saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
+import { saveAdTransactions, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
 import { normalizeOrder, searchAllOrders, shopAccess } from "../../../../lib/tiktok";
 import { fetchSettlements } from "../../../../lib/tiktok-finance";
+import { businessAccess, fetchAdTransactions } from "../../../../lib/tiktok-business";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +70,23 @@ export async function GET(request) {
       if (settlementResult.rows.length) await saveSettlements(workspaceId, settlementResult.rows);
       result.settlements = settlementResult.rows.length;
       result.statementsSkipped = settlementResult.skipped || 0;
+
+      // Business Center is optional and independent: a workspace without it must
+      // not turn the whole run into an error.
+      const business = await businessAccess(workspaceId);
+      if (business.ok && business.bcId) {
+        const end = new Date();
+        const start = new Date(end.getTime() - 60 * 86400000);
+        const ads = await fetchAdTransactions({
+          accessToken: business.accessToken,
+          bcId: business.bcId,
+          startDate: start.toISOString().slice(0, 10),
+          endDate: end.toISOString().slice(0, 10),
+        });
+        if (ads.error) result.errors.push(`ads: ${ads.error}`);
+        if (ads.rows.length) await saveAdTransactions(workspaceId, ads.rows);
+        result.adTransactions = ads.rows.length;
+      }
     } catch (error) {
       result.errors.push(error.message || "unknown");
     }

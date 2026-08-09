@@ -248,13 +248,21 @@ export function FinanceSheet({ compact = false }) {
     plRow("Settled sales", data.settledSales, "tiktok", `${data.settledOrders} settled orders`, { strong: true });
     plRow("Duit Masuk (Total settlement)", data.duitMasuk, "tiktok", `${(data.settlementRate * 100).toFixed(1)}% of settled sales`, { strong: true, fill: "Yellow" });
     plRow("Kos Produk", -data.kosProdukSettled, "manual", "settled orders only", { negative: true, fill: "Yellow" });
-    plRow("Kos Ads By Card", -data.adsCard, "manual", "Ads Manager, whole month", { negative: true });
     plRow(
-      data.adsGmvPayIsOverride || data.adFeeSources?.length ? "Ads charged inside settlement" : "Kos Ads By GMV Pay",
+      "Kos Ads By Card",
+      -data.adsCard,
+      data.adsCardIsSynced ? "tiktok" : "manual",
+      data.adsCardIsSynced ? "Business Center — card payments" : "typed; connect Business Center to measure it",
+      { negative: true },
+    );
+    plRow(
+      data.adsGmvPayIsSynced || data.adsGmvPayIsOverride ? "Kos Ads By GMV Pay" : data.adFeeSources?.length ? "Ads charged inside settlement" : "Kos Ads By GMV Pay",
       data.adsGmvPay,
       data.adsGmvPayIsOverride ? "manual" : "tiktok",
       data.adsGmvPayIsOverride
         ? "manual override — already inside settlement"
+        : data.adsGmvPayIsSynced
+          ? "Business Center — GMV Pay, already deducted from payout"
         : data.adFeeSources?.length
           ? `${data.adFeeSources.join(", ")} — already deducted, not GMV Pay top-ups`
           : "no ad fees found in settlement",
@@ -508,7 +516,7 @@ export function FinanceSheet({ compact = false }) {
             <MRow label="Settled sales" value={money(data.settledSales)} source="tiktok" strong />
             <MRow label="Duit Masuk" value={money(data.duitMasuk)} source="tiktok" strong />
             <MRow label="Kos Produk" value={money(-data.kosProdukSettled)} source="manual" deduct />
-            <MRow label="Kos Ads By Card" value={money(-data.adsCard)} source="manual" deduct />
+            <MRow label="Kos Ads By Card" value={money(-data.adsCard)} source={data.adsCardIsSynced ? "tiktok" : "manual"} deduct />
             <MRow label={data.adFeeSources?.length ? "Ads inside settlement" : "Kos Ads By GMV Pay"} value={money(data.adsGmvPay)} source={data.adsGmvPayIsOverride ? "manual" : "tiktok"} />
             <MRow label="Ad Credit" value={money(data.adCredit)} source="manual" />
             {data.otherCost !== 0 && <MRow label="Other cost" value={money(-data.otherCost)} source="manual" deduct />}
