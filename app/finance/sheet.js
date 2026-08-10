@@ -275,13 +275,15 @@ export function FinanceSheet({ compact = false }) {
       { negative: true },
     );
     plRow(
-      data.adsGmvPayIsSynced || data.adsGmvPayIsOverride ? "Kos Ads By GMV Pay" : data.adFeeSources?.length ? "Ads charged inside settlement" : "Kos Ads By GMV Pay",
-      data.adsGmvPay,
+      data.gmvPayIsDeductedFromPayout || data.adsGmvPayIsOverride ? "Kos Ads By GMV Pay" : data.adFeeSources?.length ? "Ads charged inside settlement" : "Kos Ads By GMV Pay",
+      data.gmvPayIsDeductedFromPayout ? -data.adsGmvPay : data.adsGmvPay,
       data.adsGmvPayIsOverride ? "manual" : "tiktok",
       data.adsGmvPayIsOverride
-        ? "manual override — already inside settlement"
+        ? "manual override"
+        : data.gmvPayIsDeductedFromPayout
+          ? `${data.gmvPayTransactions} GMV Pay deductions taken from your payouts`
         : data.adsGmvPayIsSynced
-          ? "Business Center — GMV Pay, already deducted from payout"
+          ? "Business Center — GMV Pay"
         : data.adFeeSources?.length
           ? `${data.adFeeSources.join(", ")} — already deducted, not GMV Pay top-ups`
           : "no ad fees found in settlement",
@@ -464,6 +466,13 @@ export function FinanceSheet({ compact = false }) {
           leaving {money(data.pendingSales)} of sales pending. The P&amp;L covers settled orders only, so it is a true margin on money received — not the month&apos;s final result.
         </p>
       )}
+      {Math.abs(data?.gmvPayOverrideDrift || 0) > 1 && (
+        <p className="finWarn">
+          Your GMV Pay override of {money(data.adsGmvPay)} differs from the {money(data.gmvPayMeasured)} TikTok actually deducted
+          across {data.gmvPayTransactions} payments, so profit is off by {money(Math.abs(data.gmvPayOverrideDrift))}.
+          Clear the override in Cost setup to use the measured figure.
+        </p>
+      )}
       {Math.abs(data?.unmatchedPayout || 0) > 1 && (
         <p className="finWarn">
           {money(data.unmatchedPayout)} settled this period across {data.unmatchedPayoutOrders} orders that carry no matching sales or cost here —
@@ -579,7 +588,12 @@ export function FinanceSheet({ compact = false }) {
             <MRow label="Duit Masuk" value={money(data.duitMasuk)} source="tiktok" strong />
             <MRow label="Kos Produk" value={money(-data.kosProdukSettled)} source="manual" deduct />
             <MRow label="Kos Ads By Card" value={money(-data.adsCard)} source={data.adsCardIsSynced ? "tiktok" : "manual"} deduct />
-            <MRow label={data.adFeeSources?.length ? "Ads inside settlement" : "Kos Ads By GMV Pay"} value={money(data.adsGmvPay)} source={data.adsGmvPayIsOverride ? "manual" : "tiktok"} />
+            <MRow
+              label="Kos Ads By GMV Pay"
+              value={money(data.gmvPayIsDeductedFromPayout ? -data.adsGmvPay : data.adsGmvPay)}
+              source={data.adsGmvPayIsOverride ? "manual" : "tiktok"}
+              deduct={data.gmvPayIsDeductedFromPayout}
+            />
             <MRow label="Ad Credit" value={money(data.adCredit)} source="manual" />
             {data.otherCost !== 0 && <MRow label="Other cost" value={money(-data.otherCost)} source="manual" deduct />}
             <MRow label={`WHT ${(data.whtRate * 100).toFixed(0)}%`} value={money(-data.wht)} source="calc" deduct />
