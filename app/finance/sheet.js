@@ -83,6 +83,7 @@ export function FinanceSheet({ compact = false }) {
   const months = useMemo(monthOptions, []);
   const [period, setPeriod] = useState(months[0].value);
   const [rangeKey, setRangeKey] = useState("month");
+  const [basis, setBasis] = useState("order");
   // Applies the stored theme so the standalone /finance page matches the app.
   useTheme();
   const [data, setData] = useState(null);
@@ -116,7 +117,7 @@ export function FinanceSheet({ compact = false }) {
       if (sync) setSyncing(true); else setLoading(true);
       setError("");
       try {
-        const query = new URLSearchParams({ from, to });
+        const query = new URLSearchParams({ from, to, basis });
         if (sync) query.set("sync", "1");
         const response = await fetch(`/api/finance/summary?${query}`, { cache: "no-store" });
         const payload = await response.json();
@@ -133,7 +134,7 @@ export function FinanceSheet({ compact = false }) {
         setLoading(false);
       }
     },
-    [rangeKey, period],
+    [rangeKey, period, basis],
   );
 
   useEffect(() => { load(false); }, [load]);
@@ -256,7 +257,12 @@ export function FinanceSheet({ compact = false }) {
       cell(basis, { className: "xlNote", span: 4 }),
     ]);
 
-    plRow("Total Sales (Order Amount)", data.totalSales, "tiktok", `all ${data.orderCount} orders`);
+    plRow(
+      "Total Sales (Order Amount)",
+      data.totalSales,
+      "tiktok",
+      data.basis === "payout" ? `${data.orderCount} orders paid out in this period` : `all ${data.orderCount} orders created in this period`,
+    );
     if (data.pendingSales > 0) plRow("Less: sales not yet settled", -data.pendingSales, "tiktok", `${data.pendingOrders} orders still pending payout`, { negative: true });
     plRow("Settled sales", data.settledSales, "tiktok", `${data.settledOrders} settled orders`, { strong: true });
     plRow("Duit Masuk (Total settlement)", data.duitMasuk, "tiktok", `${(data.settlementRate * 100).toFixed(1)}% of settled sales`, { strong: true, fill: "Yellow" });
@@ -410,6 +416,10 @@ export function FinanceSheet({ compact = false }) {
               </button>
             ))}
           </div>
+          <div className="rangeChips basisChips" role="tablist" aria-label="Accounting basis">
+            <button role="tab" aria-selected={basis === "order"} className={basis === "order" ? "on" : ""} onClick={() => setBasis("order")} title="Every order created in this period, plus everything it will ever pay out">by order date</button>
+            <button role="tab" aria-selected={basis === "payout"} className={basis === "payout" ? "on" : ""} onClick={() => setBasis("payout")} title="Money that actually settled in this period, whenever the order was placed">by payout date</button>
+          </div>
           {rangeKey === "month" && (
             <select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="Month">
               {months.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
@@ -452,6 +462,13 @@ export function FinanceSheet({ compact = false }) {
         <p className="finWarn">
           <b>This month is still paying out.</b> {data.settledOrders} of {data.orderCount} orders have settled ({settledPercent.toFixed(0)}%),
           leaving {money(data.pendingSales)} of sales pending. The P&amp;L covers settled orders only, so it is a true margin on money received — not the month&apos;s final result.
+        </p>
+      )}
+      {Math.abs(data?.unmatchedPayout || 0) > 1 && (
+        <p className="finWarn">
+          {money(data.unmatchedPayout)} settled this period across {data.unmatchedPayoutOrders} orders that carry no matching sales or cost here —
+          typically refunds on cancelled orders, or orders created before the synced window. Excluded from the P&amp;L so income and cost describe the
+          same orders; it is still real money moving through your account.
         </p>
       )}
       {data?.unmappedSkus?.length > 0 && (

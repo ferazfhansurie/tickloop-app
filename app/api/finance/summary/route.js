@@ -108,7 +108,8 @@ export async function GET(request) {
       };
     }
 
-    const summary = await financeSummary(user.workspace_id, fromIso, toIso);
+    const basis = searchParams.get("basis") === "payout" ? "payout" : "order";
+    const summary = await financeSummary(user.workspace_id, fromIso, toIso, basis);
     const [productCosts, periodCosts, skus, lastSynced] = await Promise.all([
       listProductCosts(user.workspace_id),
       listPeriodCosts(user.workspace_id),
