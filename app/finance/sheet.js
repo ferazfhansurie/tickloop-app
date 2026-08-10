@@ -119,27 +119,6 @@ export function FinanceSheet({ compact = false }) {
     }
   }
 
-  async function importAffiliates(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setImporting(true);
-    setImportMessage("");
-    try {
-      const response = await fetch("/api/finance/affiliates", { method: "POST", body: await file.text() });
-      const payload = await response.json();
-      if (!response.ok) { setImportMessage(payload.error || "Import failed."); return; }
-      setImportMessage(
-        payload.imported + " orders from " + payload.creators + " creators, " + payload.matchedOrders + " matched"
-        + (payload.unmatchedOrders ? ", " + payload.unmatchedOrders + " not in the synced window" : ""),
-      );
-      onSaved();
-    } catch (error) {
-      setImportMessage(error.message || "Import failed.");
-    } finally {
-      setImporting(false);
-    }
-  }
 
   const money = useCallback(
     (value) => {
@@ -594,17 +573,12 @@ export function FinanceSheet({ compact = false }) {
             <h3 className="costSubhead">Affiliate attribution</h3>
             <p className="finMuted costNote">
               Which creator drove each order is the one thing TikTok&apos;s APIs never expose. Upload the Affiliate export
-              TikTok does expose it on the affiliate endpoint, so Sync pulls it directly. The CSV upload stays for backfilling
-              further than the API reaches, or if your authorization lacks the affiliate scope.
+              Pulled straight from TikTok&apos;s affiliate endpoint, and refreshed hourly with everything else — nothing to download or upload.
             </p>
             <div className="costUpload">
               <button className="primary" onClick={syncAffiliates} disabled={importing}>
-                {importing ? "Working..." : "Sync from TikTok"}
+                {importing ? "Syncing..." : "Sync affiliates from TikTok"}
               </button>
-              <label className="finGhost">
-                {importing ? "Importing..." : "Choose affiliate CSV"}
-                <input type="file" accept=".csv,text/csv" hidden onChange={importAffiliates} disabled={importing} />
-              </label>
               {importMessage && <span className="finMuted">{importMessage}</span>}
             </div>
 
