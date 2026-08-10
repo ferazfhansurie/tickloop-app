@@ -100,6 +100,30 @@ export function FinanceSheet({ compact = false }) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [opexRows, setOpexRows] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
+
+  async function importAffiliates(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    setImportMessage("");
+    try {
+      const response = await fetch("/api/finance/affiliates", { method: "POST", body: await file.text() });
+      const payload = await response.json();
+      if (!response.ok) { setImportMessage(payload.error || "Import failed."); return; }
+      setImportMessage(
+        payload.imported + " orders from " + payload.creators + " creators, " + payload.matchedOrders + " matched"
+        + (payload.unmatchedOrders ? ", " + payload.unmatchedOrders + " not in the synced window" : ""),
+      );
+      onSaved();
+    } catch (error) {
+      setImportMessage(error.message || "Import failed.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   const money = useCallback(
     (value) => {
@@ -342,6 +366,45 @@ export function FinanceSheet({ compact = false }) {
     ]);
     out.push(spacer());
 
+    /* ---- creator leaderboard ---- */
+    if (data.leaderboard?.length) {
+      out.push(spacer());
+      out.push(title("PROFIT BY AFFILIATE"));
+      out.push([
+        cell("Creator", { className: "xlHead" }),
+        cell("Orders", { className: "xlHead" }),
+        cell("Sales", { className: "xlHead" }),
+        cell("Settled", { className: "xlHead" }),
+        cell("Kos Produk", { className: "xlHead" }),
+        cell("Profit", { className: "xlHead" }),
+        cell("Margin", { className: "xlHead" }),
+      ]);
+      for (const row of data.leaderboard) {
+        out.push([
+          cell(row.creator, { className: "xlLabel", title: row.contentTypes.join(", ") }),
+          cell(row.settledOrders + "/" + row.orders, { className: "xlNum" }),
+          cell(money(row.sales), { className: "xlNum" }),
+          cell(money(row.settlement), { className: "xlNum" }),
+          cell(money(row.cogs), { className: "xlNum" }),
+          cell(money(row.profit), { className: "xlNum" + (row.profit < 0 ? " xlNeg" : "") }),
+          cell((row.margin * 100).toFixed(1) + "%", { className: "xlNum" }),
+        ]);
+      }
+      const t = data.leaderboard.reduce((acc, row) => ({
+        orders: acc.orders + row.orders, settled: acc.settled + row.settledOrders, sales: acc.sales + row.sales,
+        settlement: acc.settlement + row.settlement, cogs: acc.cogs + row.cogs, profit: acc.profit + row.profit,
+      }), { orders: 0, settled: 0, sales: 0, settlement: 0, cogs: 0, profit: 0 });
+      out.push([
+        cell("TOTAL", { className: "xlTotalLabel" }),
+        cell(t.settled + "/" + t.orders, { className: "xlTotal xlNum" }),
+        cell(money(t.sales), { className: "xlTotal xlNum" }),
+        cell(money(t.settlement), { className: "xlTotal xlNum" }),
+        cell(money(t.cogs), { className: "xlTotal xlNum" }),
+        cell(money(t.profit), { className: "xlTotal xlNum" }),
+        cell(t.settlement > 0 ? ((t.profit / t.settlement) * 100).toFixed(1) + "%" : "-", { className: "xlTotal xlNum" }),
+      ]);
+    }
+
     /* ---- settlement breakdown block ---- */
     out.push(title("TIKTOK SHOP SETTLEMENT BREAKDOWN"));
     if (!data.lines.length) {
@@ -527,6 +590,19 @@ export function FinanceSheet({ compact = false }) {
               </table>
             </div>
 
+            <h3 className="costSubhead">Affiliate attribution</h3>
+            <p className="finMuted costNote">
+              Which creator drove each order is the one thing TikTok&apos;s APIs never expose. Upload the Affiliate export
+              (Seller Center &rarr; Affiliate &rarr; Orders, saved as CSV) and every order is split by creator from then on.
+            </p>
+            <div className="costUpload">
+              <label className="finGhost">
+                {importing ? "Importing..." : "Choose affiliate CSV"}
+                <input type="file" accept=".csv,text/csv" hidden onChange={importAffiliates} disabled={importing} />
+              </label>
+              {importMessage && <span className="finMuted">{importMessage}</span>}
+            </div>
+
             <h3 className="costSubhead">Operating expenses — {period}</h3>
             <p className="finMuted costNote">Fixed monthly running costs. A settlement-only P&amp;L flatters the business because none of this appears in it.</p>
             <div className="costScroll">
@@ -618,6 +694,18 @@ export function FinanceSheet({ compact = false }) {
               </div>
             ))}
           </section>
+
+          {data.leaderboard?.length > 0 && (
+            <section className="mCard">
+              <p className="mEyebrow">// profit by affiliate</p>
+              {data.leaderboard.map((row) => (
+                <div key={row.creator} className="mBundle">
+                  <div className="mBundleTop"><b>{row.creator}</b><span>{money(row.profit)}</span></div>
+                  <div className="mBundleFoot">{row.settledOrders}/{row.orders} settled - sales {money(row.sales)} - {(row.margin * 100).toFixed(1)}% margin</div>
+                </div>
+              ))}
+            </section>
+          )}
 
           {data.lines.length > 0 && (
             <section className="mCard">
