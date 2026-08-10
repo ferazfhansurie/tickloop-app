@@ -103,6 +103,28 @@ export function FinanceSheet({ compact = false }) {
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
 
+  async function importAffiliates(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    setImportMessage("");
+    try {
+      const response = await fetch("/api/finance/affiliates", { method: "POST", body: await file.text() });
+      const payload = await response.json();
+      if (!response.ok) { setImportMessage(payload.error || "Import failed."); return; }
+      setImportMessage(
+        payload.imported + " orders from " + payload.creators + " creators, " + payload.matchedOrders + " matched"
+        + (payload.unmatchedOrders ? ", " + payload.unmatchedOrders + " not in the synced window" : ""),
+      );
+      onSaved();
+    } catch (error) {
+      setImportMessage(error.message || "Import failed.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function syncAffiliates() {
     setImporting(true);
     setImportMessage("");
@@ -403,7 +425,7 @@ export function FinanceSheet({ compact = false }) {
     if (!data.leaderboard?.length) {
       out.push(spacer());
       out.push(title("PROFIT BY AFFILIATE"));
-      out.push([cell("No affiliate data yet. Open Cost setup and hit Sync from TikTok to split every order by creator.", { className: "xlNote", span: COLUMNS.length })]);
+      out.push([cell("No affiliate data yet. Open Cost setup and upload the Affiliate export (Seller Center > Affiliate > Orders, saved as CSV) to split every order by creator.", { className: "xlNote", span: COLUMNS.length })]);
     }
 
     /* ---- settlement breakdown block ---- */
@@ -573,12 +595,15 @@ export function FinanceSheet({ compact = false }) {
             <h3 className="costSubhead">Affiliate attribution</h3>
             <p className="finMuted costNote">
               Which creator drove each order is the one thing TikTok&apos;s APIs never expose. Upload the Affiliate export
-              Pulled straight from TikTok&apos;s affiliate endpoint, and refreshed hourly with everything else — nothing to download or upload.
+              Export it from Seller Center (Affiliate &rarr; Orders), save as CSV and upload. TikTok does publish an affiliate API, but the
+              scope is not offered to every app type — if yours has it, &ldquo;Try API sync&rdquo; skips the file entirely.
             </p>
             <div className="costUpload">
-              <button className="primary" onClick={syncAffiliates} disabled={importing}>
-                {importing ? "Syncing..." : "Sync affiliates from TikTok"}
-              </button>
+              <label className="primary">
+                {importing ? "Working..." : "Upload affiliate CSV"}
+                <input type="file" accept=".csv,text/csv" hidden onChange={importAffiliates} disabled={importing} />
+              </label>
+              <button className="finGhost" onClick={syncAffiliates} disabled={importing}>Try API sync</button>
               {importMessage && <span className="finMuted">{importMessage}</span>}
             </div>
 
