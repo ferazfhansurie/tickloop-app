@@ -393,8 +393,8 @@ export function FinanceSheet({ compact = false }) {
         cell("Sales", { className: "xlHead" }),
         cell("Settled", { className: "xlHead" }),
         cell("Kos Produk", { className: "xlHead" }),
+        cell("Commission", { className: "xlHead" }),
         cell("Profit", { className: "xlHead" }),
-        cell("Margin", { className: "xlHead" }),
       ]);
       for (const row of data.leaderboard) {
         out.push([
@@ -403,22 +403,23 @@ export function FinanceSheet({ compact = false }) {
           cell(money(row.sales), { className: "xlNum" }),
           cell(money(row.settlement), { className: "xlNum" }),
           cell(money(row.cogs), { className: "xlNum" }),
+          cell(money(row.commission) + " (" + (row.commissionRate * 100).toFixed(1) + "%)", { className: "xlNum" }),
           cell(money(row.profit), { className: "xlNum" + (row.profit < 0 ? " xlNeg" : "") }),
-          cell((row.margin * 100).toFixed(1) + "%", { className: "xlNum" }),
         ]);
       }
       const t = data.leaderboard.reduce((acc, row) => ({
         orders: acc.orders + row.orders, settled: acc.settled + row.settledOrders, sales: acc.sales + row.sales,
-        settlement: acc.settlement + row.settlement, cogs: acc.cogs + row.cogs, profit: acc.profit + row.profit,
-      }), { orders: 0, settled: 0, sales: 0, settlement: 0, cogs: 0, profit: 0 });
+        settlement: acc.settlement + row.settlement, cogs: acc.cogs + row.cogs,
+        commission: acc.commission + row.commission, profit: acc.profit + row.profit,
+      }), { orders: 0, settled: 0, sales: 0, settlement: 0, cogs: 0, commission: 0, profit: 0 });
       out.push([
         cell("TOTAL", { className: "xlTotalLabel" }),
         cell(t.settled + "/" + t.orders, { className: "xlTotal xlNum" }),
         cell(money(t.sales), { className: "xlTotal xlNum" }),
         cell(money(t.settlement), { className: "xlTotal xlNum" }),
         cell(money(t.cogs), { className: "xlTotal xlNum" }),
+        cell(money(t.commission), { className: "xlTotal xlNum" }),
         cell(money(t.profit), { className: "xlTotal xlNum" }),
-        cell(t.settlement > 0 ? ((t.profit / t.settlement) * 100).toFixed(1) + "%" : "-", { className: "xlTotal xlNum" }),
       ]);
     }
 
@@ -733,7 +734,7 @@ export function FinanceSheet({ compact = false }) {
               {data.leaderboard.map((row) => (
                 <div key={row.creator} className="mBundle">
                   <div className="mBundleTop"><b>{row.creator}</b><span>{money(row.profit)}</span></div>
-                  <div className="mBundleFoot">{row.settledOrders}/{row.orders} settled - sales {money(row.sales)} - {(row.margin * 100).toFixed(1)}% margin</div>
+                  <div className="mBundleFoot">{row.settledOrders}/{row.orders} settled - sales {money(row.sales)} - commission {money(row.commission)} ({(row.commissionRate * 100).toFixed(1)}%) - {(row.margin * 100).toFixed(1)}% margin</div>
                 </div>
               ))}
             </section>
