@@ -98,6 +98,7 @@ export function FinanceSheet({ compact = false }) {
   const [periodCost, setPeriodCost] = useState({ period, adsCard: 0, adCredit: 0, whtRate: 0.1, otherCost: 0, adsGmvPayOverride: null, notes: null });
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [opexRows, setOpexRows] = useState([]);
 
   const money = useCallback(
     (value) => {
@@ -175,7 +176,19 @@ export function FinanceSheet({ compact = false }) {
     }
     setProducts(rows);
     const found = (data.periodCosts || []).find((cost) => cost.period === period);
-    setPeriodCost(found || { period, adsCard: 0, adCredit: 0, whtRate: 0.1, otherCost: 0, adsGmvPayOverride: null, notes: null });
+    setPeriodCost(found || { period, adsCard: 0, adCredit: 0, whtRate: 0.1, otherCost: 0, adsGmvPayOverride: null, fulfilmentRate: 0, cogsMarkupPct: 0, notes: null });
+
+    // Seed from the template so the seller edits a familiar list rather than an
+    // empty one, keeping whatever is already saved for this month.
+    const saved = new Map((data.opexRows || []).map((row) => [`${row.category}|${row.label}`, Number(row.amount)]));
+    const seeded = [];
+    for (const [category, labels] of Object.entries(data.opexTemplate || {})) {
+      for (const label of labels) seeded.push({ category, label, amount: saved.get(`${category}|${label}`) ?? 0 });
+    }
+    for (const row of data.opexRows || []) {
+      if (!seeded.some((entry) => entry.category === row.category && entry.label === row.label)) seeded.push({ ...row });
+    }
+    setOpexRows(seeded);
   }, [data, period]);
 
   async function saveCosts() {
@@ -185,7 +198,7 @@ export function FinanceSheet({ compact = false }) {
       const response = await fetch("/api/finance/costs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ products, period: periodCost }),
+        body: JSON.stringify({ products, period: periodCost, opex: opexRows, opexPeriod: period }),
       });
       const payload = await response.json();
       if (!response.ok) { setSaveMessage(payload.error || "Could not save."); return; }
@@ -270,6 +283,18 @@ export function FinanceSheet({ compact = false }) {
     plRow("Ad Credit", data.adCredit, "manual", "not netted off profit");
     if (data.otherCost !== 0) plRow("Other cost", -data.otherCost, "manual", "whole month", { negative: true });
     plRow(`WHT ${(data.whtRate * 100).toFixed(0)}% (To Pay)`, -data.wht, "calc", "on card + GMV Pay ad spend", { negative: true, fill: "Yellow" });
+    if (data.fulfilmentCost > 0) plRow("Fulfilment", -data.fulfilmentCost, "calc", `${data.shippedParcels.toLocaleString()} parcels shipped x ${money(data.fulfilmentRate)}`, { negative: true });
+    if (data.opexTotal > 0) {
+      out.push([
+        cell("Operating profit", { className: "xlLabel xlStrong" }),
+        cell(money(data.operatingProfit), { className: `xlNum${data.operatingProfit < 0 ? " xlNeg" : ""}` }),
+        cell("Calc", { className: "xlTag xlTag-calc" }),
+        cell("before fixed running costs", { className: "xlNote", span: 4 }),
+      ]);
+      for (const [category, amount] of Object.entries(data.opexByCategory || {})) {
+        plRow(`OPEX — ${category}`, -amount, "manual", (data.opexLines || []).filter((line) => line.category === category).map((line) => line.label).join(", "), { negative: true });
+      }
+    }
     out.push([
       cell("NETT PROFIT", { className: "xlTotalLabel" }),
       cell(money(data.nettProfit), { className: `xlTotal xlNum${data.nettProfit < 0 ? " xlNeg" : ""}` }),
@@ -476,6 +501,24 @@ export function FinanceSheet({ compact = false }) {
               </table>
             </div>
 
+            <h3 className="costSubhead">Operating expenses — {period}</h3>
+            <p className="finMuted costNote">Fixed monthly running costs. A settlement-only P&amp;L flatters the business because none of this appears in it.</p>
+            <div className="costScroll">
+              <table className="costTable">
+                <thead><tr><th>Category</th><th>Item</th><th>Amount / month</th></tr></thead>
+                <tbody>
+                  {opexRows.map((row, index) => (
+                    <tr key={`${row.category}-${row.label}-${index}`}>
+                      <th>{row.category}</th>
+                      <td className="costName">{row.label}</td>
+                      <td><input type="number" step="0.01" value={row.amount} onChange={(event) => setOpexRows(rows => rows.map((r, i) => i === index ? { ...r, amount: Number(event.target.value) } : r))} /></td>
+                    </tr>
+                  ))}
+                  <tr><th>Total</th><td /><td className="costSold"><b>{money(opexRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0))}</b></td></tr>
+                </tbody>
+              </table>
+            </div>
+
             <h3 className="costSubhead">Ad spend &amp; tax — {period}</h3>
             <p className="finMuted costNote">GMV Pay syncs from TikTok&apos;s GMV Max ad fee. Card-billed spend and ad credits live in TikTok Ads Manager, which a TikTok Shop authorization cannot reach.</p>
             <div className="costFields">
@@ -494,6 +537,8 @@ export function FinanceSheet({ compact = false }) {
               <label>Ad Credit<input type="number" step="0.01" value={periodCost.adCredit} onChange={(event) => setPeriodCost({ ...periodCost, adCredit: Number(event.target.value) })} /></label>
               <label>Other cost<input type="number" step="0.01" value={periodCost.otherCost} onChange={(event) => setPeriodCost({ ...periodCost, otherCost: Number(event.target.value) })} /></label>
               <label>WHT rate (%)<input type="number" step="0.1" value={(periodCost.whtRate * 100).toFixed(1)} onChange={(event) => setPeriodCost({ ...periodCost, whtRate: Number(event.target.value) / 100 })} /></label>
+              <label>Fulfilment per parcel<input type="number" step="0.01" value={periodCost.fulfilmentRate ?? 0} onChange={(event) => setPeriodCost({ ...periodCost, fulfilmentRate: Number(event.target.value) })} /></label>
+              <label>COGS markup (%)<input type="number" step="1" value={periodCost.cogsMarkupPct ?? 0} onChange={(event) => setPeriodCost({ ...periodCost, cogsMarkupPct: Number(event.target.value) })} /></label>
               <div className="costField"><span>WHT to pay</span><b>{money(periodCost.whtRate * (periodCost.adsCard + (periodCost.adsGmvPayOverride ?? (data.adsGmvPayIsOverride ? 0 : data.adsGmvPay))))}</b></div>
             </div>
           </section>
@@ -521,6 +566,10 @@ export function FinanceSheet({ compact = false }) {
             <MRow label="Ad Credit" value={money(data.adCredit)} source="manual" />
             {data.otherCost !== 0 && <MRow label="Other cost" value={money(-data.otherCost)} source="manual" deduct />}
             <MRow label={`WHT ${(data.whtRate * 100).toFixed(0)}%`} value={money(-data.wht)} source="calc" deduct />
+            {data.fulfilmentCost > 0 && <MRow label={`Fulfilment (${data.shippedParcels} parcels)`} value={money(-data.fulfilmentCost)} source="calc" deduct />}
+            {Object.entries(data.opexByCategory || {}).map(([category, amount]) => (
+              <MRow key={category} label={`OPEX — ${category}`} value={money(-amount)} source="manual" deduct />
+            ))}
             <div className="mTotal"><span>Nett Profit</span><b className={data.nettProfit < 0 ? "neg" : ""}>{money(data.nettProfit)}</b></div>
           </section>
 

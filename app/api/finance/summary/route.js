@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../lib/auth";
-import { discoverSkus, financeSummary, lastSyncedAt, listPeriodCosts, listProductCosts, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
+import { OPEX_TEMPLATE, discoverSkus, financeSummary, lastSyncedAt, listOpex, listPeriodCosts, listProductCosts, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
 import { hasFinanceScope, normalizeOrder, searchAllOrders, shopAccess } from "../../../../lib/tiktok";
 import { fetchSettlements } from "../../../../lib/tiktok-finance";
 
@@ -116,7 +116,10 @@ export async function GET(request) {
       lastSyncedAt(user.workspace_id),
     ]);
 
-    return NextResponse.json({ ...summary, productCosts, periodCosts, skus, lastSynced, ...(sync ? { sync } : {}) });
+    // The editor edits one month; the summary may span several, so send the rows
+    // for the range's first month rather than a merged view that cannot be saved.
+    const opexRows = await listOpex(user.workspace_id, summary.periods[0]);
+    return NextResponse.json({ ...summary, productCosts, periodCosts, skus, lastSynced, opexRows, opexTemplate: OPEX_TEMPLATE, ...(sync ? { sync } : {}) });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Could not build the summary." }, { status: 500 });
   }

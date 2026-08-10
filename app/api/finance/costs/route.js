@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "../../../../lib/auth";
-import { deleteProductCost, listPeriodCosts, listProductCosts, savePeriodCost, saveProductCosts } from "../../../../lib/finance";
+import { OPEX_TEMPLATE, deleteProductCost, listOpex, listPeriodCosts, listProductCosts, savePeriodCost, saveOpex, saveProductCosts } from "../../../../lib/finance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +45,8 @@ export async function POST(request) {
         adCredit: Number(payload.period.adCredit) || 0,
         whtRate: Number.isFinite(Number(payload.period.whtRate)) ? Number(payload.period.whtRate) : 0.1,
         otherCost: Number(payload.period.otherCost) || 0,
+        fulfilmentRate: Number(payload.period.fulfilmentRate) || 0,
+        cogsMarkupPct: Number(payload.period.cogsMarkupPct) || 0,
         // null means "trust the synced GMV Max ad fee" — distinct from an override of 0.
         adsGmvPayOverride: override === null || override === undefined || override === "" ? null : Number(override) || 0,
         notes: payload.period.notes ?? null,
@@ -53,8 +55,15 @@ export async function POST(request) {
 
     if (payload.deleteSkuKey) await deleteProductCost(user.workspace_id, String(payload.deleteSkuKey));
 
+    // OPEX replaces the whole month, so an emptied list clears it rather than
+    // leaving stale lines behind.
+    if (Array.isArray(payload.opex) && payload.opexPeriod) {
+      await saveOpex(user.workspace_id, String(payload.opexPeriod), payload.opex);
+    }
+
     const [products, periods] = await Promise.all([listProductCosts(user.workspace_id), listPeriodCosts(user.workspace_id)]);
-    return NextResponse.json({ products, periods });
+    const opex = payload.opexPeriod ? await listOpex(user.workspace_id, String(payload.opexPeriod)) : [];
+    return NextResponse.json({ products, periods, opex, opexTemplate: OPEX_TEMPLATE });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Could not save." }, { status: 500 });
   }
