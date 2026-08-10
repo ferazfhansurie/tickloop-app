@@ -31,12 +31,21 @@ async function run(request) {
 
   if (result.rows.length) await saveAttributions(user.workspace_id, result.rows);
 
+  // TikTok reports a missing scope as a generic "Access denied", which does not
+  // say what to do about it. The fix is specific and worth stating.
+  const scopeDenied = /access denied|access scope|not authorized/i.test(result.error || "");
+  const error = scopeDenied
+    ? "Your shop authorization does not include affiliate access. In Partner Center enable the Affiliate scopes on the app, then reconnect the shop so a new token picks them up."
+    : result.error || null;
+
   return NextResponse.json({
+    scopeDenied,
     imported: result.rows.length,
     creators: new Set(result.rows.map((row) => row.creator)).size,
     windowDays: days,
     truncated: result.truncated,
-    error: result.error || null,
+    error,
+    tiktokMessage: result.error || null,
     sample: result.sample || null,
   });
 }

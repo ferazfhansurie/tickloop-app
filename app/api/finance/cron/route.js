@@ -79,7 +79,13 @@ export async function GET(request) {
         shopCipher: access.shopCipher,
         createTimeGe: Math.floor(Date.now() / 1000) - orderDays * 86400,
       });
-      if (affiliate.error) result.errors.push(`affiliate: ${affiliate.error}`);
+      // A shop that simply lacks the scope is a configuration fact, not an hourly
+      // failure — record it once, distinctly, so real errors stay visible.
+      if (affiliate.error) {
+        result.errors.push(/access denied|access scope|not authorized/i.test(affiliate.error)
+          ? "affiliate: scope not granted (reconnect the shop with affiliate access to enable creator attribution)"
+          : `affiliate: ${affiliate.error}`);
+      }
       if (affiliate.rows.length) await saveAttributions(workspaceId, affiliate.rows);
       result.attributions = affiliate.rows.length;
 
