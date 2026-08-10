@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { database, ensureSchema } from "../../../../lib/db";
-import { saveAdTransactions, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
+import { saveAdTransactions, saveAttributions, saveOrders, saveSettlements, syncedStatementIds } from "../../../../lib/finance";
 import { normalizeOrder, searchAllOrders, shopAccess } from "../../../../lib/tiktok";
 import { fetchSettlements } from "../../../../lib/tiktok-finance";
+import { fetchAffiliateOrders } from "../../../../lib/tiktok-affiliate";
 import { businessAccess, fetchAdTransactions } from "../../../../lib/tiktok-business";
 
 export const runtime = "nodejs";
@@ -70,6 +71,17 @@ export async function GET(request) {
       if (settlementResult.rows.length) await saveSettlements(workspaceId, settlementResult.rows);
       result.settlements = settlementResult.rows.length;
       result.statementsSkipped = settlementResult.skipped || 0;
+
+      // Creator attribution, same window as orders. Optional scope: a shop
+      // without it should not fail the run.
+      const affiliate = await fetchAffiliateOrders({
+        accessToken: access.accessToken,
+        shopCipher: access.shopCipher,
+        createTimeGe: Math.floor(Date.now() / 1000) - orderDays * 86400,
+      });
+      if (affiliate.error) result.errors.push(`affiliate: ${affiliate.error}`);
+      if (affiliate.rows.length) await saveAttributions(workspaceId, affiliate.rows);
+      result.attributions = affiliate.rows.length;
 
       // Business Center is optional and independent: a workspace without it must
       // not turn the whole run into an error.

@@ -103,6 +103,22 @@ export function FinanceSheet({ compact = false }) {
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
 
+  async function syncAffiliates() {
+    setImporting(true);
+    setImportMessage("");
+    try {
+      const response = await fetch("/api/finance/affiliates/sync?days=90", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok || payload.error) { setImportMessage(payload.error || "Sync failed."); return; }
+      setImportMessage(`${payload.imported} orders from ${payload.creators} creators, straight from TikTok.`);
+      onSaved();
+    } catch (error) {
+      setImportMessage(error.message || "Sync failed.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function importAffiliates(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -408,7 +424,7 @@ export function FinanceSheet({ compact = false }) {
     if (!data.leaderboard?.length) {
       out.push(spacer());
       out.push(title("PROFIT BY AFFILIATE"));
-      out.push([cell("No affiliate data yet. Open Cost setup and upload the Affiliate export (Seller Center > Affiliate > Orders, saved as CSV) to split every order by creator.", { className: "xlNote", span: COLUMNS.length })]);
+      out.push([cell("No affiliate data yet. Open Cost setup and hit Sync from TikTok to split every order by creator.", { className: "xlNote", span: COLUMNS.length })]);
     }
 
     /* ---- settlement breakdown block ---- */
@@ -578,9 +594,13 @@ export function FinanceSheet({ compact = false }) {
             <h3 className="costSubhead">Affiliate attribution</h3>
             <p className="finMuted costNote">
               Which creator drove each order is the one thing TikTok&apos;s APIs never expose. Upload the Affiliate export
-              (Seller Center &rarr; Affiliate &rarr; Orders, saved as CSV) and every order is split by creator from then on.
+              TikTok does expose it on the affiliate endpoint, so Sync pulls it directly. The CSV upload stays for backfilling
+              further than the API reaches, or if your authorization lacks the affiliate scope.
             </p>
             <div className="costUpload">
+              <button className="primary" onClick={syncAffiliates} disabled={importing}>
+                {importing ? "Working..." : "Sync from TikTok"}
+              </button>
               <label className="finGhost">
                 {importing ? "Importing..." : "Choose affiliate CSV"}
                 <input type="file" accept=".csv,text/csv" hidden onChange={importAffiliates} disabled={importing} />
