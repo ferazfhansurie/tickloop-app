@@ -526,3 +526,27 @@ body{background:var(--bg);color:var(--text)}
 .costUpload{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 18px 4px}
 .costUpload label{cursor:pointer;display:inline-block}
 @media(max-width:700px){.costUpload{padding:0 14px 4px}}
+
+/* --- Cost setup on a phone -----------------------------------------------
+   These tables were built for a desktop column and needed 640px, so on a phone
+   the editable fields sat off-screen behind a horizontal scroll. Non-essential
+   columns are dropped instead: what stays is what you actually type into. */
+@media(max-width:700px){
+  .costTable{min-width:0}
+  .costTable th,.costTable td{padding:8px 9px;white-space:normal}
+  /* SKU table: hide "TikTok name" (col 2) and "Sold" (col 6). */
+  .costPanel .costScroll:nth-of-type(1) .costTable th:nth-child(2),
+  .costPanel .costScroll:nth-of-type(1) .costTable td:nth-child(2),
+  .costPanel .costScroll:nth-of-type(1) .costTable th:nth-child(6),
+  .costPanel .costScroll:nth-of-type(1) .costTable td:nth-child(6){display:none}
+  .costTable input{min-width:0;font-size:16px}   /* 16px stops iOS zooming on focus */
+  .costTable code{font-size:11px}
+  .costPanelHead{flex-direction:column;align-items:stretch;gap:12px}
+  .costPanelActions{justify-content:space-between}
+  .costUpload{flex-direction:column;align-items:stretch;gap:8px}
+  .costUpload label{text-align:center;padding:13px}
+  .costSubhead{font-size:15px}
+  .costNote{font-size:13px}
+  .costFields input{font-size:16px}
+  .finFields input{font-size:16px}
+}

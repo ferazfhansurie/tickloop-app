@@ -405,6 +405,12 @@ export function FinanceSheet({ compact = false }) {
       ]);
     }
 
+    if (!data.leaderboard?.length) {
+      out.push(spacer());
+      out.push(title("PROFIT BY AFFILIATE"));
+      out.push([cell("No affiliate data yet. Open Cost setup and upload the Affiliate export (Seller Center > Affiliate > Orders, saved as CSV) to split every order by creator.", { className: "xlNote", span: COLUMNS.length })]);
+    }
+
     /* ---- settlement breakdown block ---- */
     out.push(title("TIKTOK SHOP SETTLEMENT BREAKDOWN"));
     if (!data.lines.length) {
@@ -569,6 +575,20 @@ export function FinanceSheet({ compact = false }) {
               </div>
             </div>
 
+            <h3 className="costSubhead">Affiliate attribution</h3>
+            <p className="finMuted costNote">
+              Which creator drove each order is the one thing TikTok&apos;s APIs never expose. Upload the Affiliate export
+              (Seller Center &rarr; Affiliate &rarr; Orders, saved as CSV) and every order is split by creator from then on.
+            </p>
+            <div className="costUpload">
+              <label className="finGhost">
+                {importing ? "Importing..." : "Choose affiliate CSV"}
+                <input type="file" accept=".csv,text/csv" hidden onChange={importAffiliates} disabled={importing} />
+              </label>
+              {importMessage && <span className="finMuted">{importMessage}</span>}
+            </div>
+
+            <h3 className="costSubhead">Product cost per SKU</h3>
             <div className="costScroll">
               <table className="costTable">
                 <thead>
@@ -588,19 +608,6 @@ export function FinanceSheet({ compact = false }) {
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <h3 className="costSubhead">Affiliate attribution</h3>
-            <p className="finMuted costNote">
-              Which creator drove each order is the one thing TikTok&apos;s APIs never expose. Upload the Affiliate export
-              (Seller Center &rarr; Affiliate &rarr; Orders, saved as CSV) and every order is split by creator from then on.
-            </p>
-            <div className="costUpload">
-              <label className="finGhost">
-                {importing ? "Importing..." : "Choose affiliate CSV"}
-                <input type="file" accept=".csv,text/csv" hidden onChange={importAffiliates} disabled={importing} />
-              </label>
-              {importMessage && <span className="finMuted">{importMessage}</span>}
             </div>
 
             <h3 className="costSubhead">Operating expenses — {period}</h3>
@@ -695,6 +702,12 @@ export function FinanceSheet({ compact = false }) {
             ))}
           </section>
 
+          {!data.leaderboard?.length && (
+            <section className="mCard">
+              <p className="mEyebrow">// profit by affiliate</p>
+              <p className="mEmpty">No affiliate data yet. Open Cost setup and upload the Affiliate export to split every order by creator.</p>
+            </section>
+          )}
           {data.leaderboard?.length > 0 && (
             <section className="mCard">
               <p className="mEyebrow">// profit by affiliate</p>
