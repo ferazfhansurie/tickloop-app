@@ -91,6 +91,24 @@ export function FinanceSheet({ compact = false }) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [showCosts, setShowCosts] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
+  const [rawOrders, setRawOrders] = useState(null);
+  const [rawLoading, setRawLoading] = useState(false);
+
+  async function toggleRaw() {
+    const next = !showRaw;
+    setShowRaw(next);
+    if (next && !rawOrders) {
+      setRawLoading(true);
+      try {
+        const response = await fetch("/api/finance/raw-orders?limit=20", { cache: "no-store" });
+        const payload = await response.json();
+        setRawOrders(payload.orders || []);
+      } finally {
+        setRawLoading(false);
+      }
+    }
+  }
   const [live, setLive] = useState(true);
   const [tick, setTick] = useState(0);
 
@@ -515,6 +533,7 @@ export function FinanceSheet({ compact = false }) {
             </select>
           )}
           <button className="finGhost" onClick={() => setShowCosts((open) => !open)}>{showCosts ? "Hide cost setup" : "Cost setup"}</button>
+          <button className="finGhost" onClick={toggleRaw}>{showRaw ? "Hide order IDs" : "Show order IDs"}</button>
           <button className={`finLive${live ? " on" : ""}`} onClick={() => setLive((value) => !value)} title="Re-read every 30s">
             <i />{live ? "Live" : "Paused"}
           </button>
@@ -579,6 +598,41 @@ export function FinanceSheet({ compact = false }) {
 
       {data && (
         <>
+        {showRaw && (
+          <section className="costPanel">
+            <div className="costPanelHead">
+              <div>
+                <h2>Raw TikTok order data</h2>
+                <p>Individual synced orders exactly as TikTok Shop returns them — order id, product id and SKU id, unaggregated. For verifying the live integration.</p>
+              </div>
+              <div className="costPanelActions">
+                <button className="costClose" onClick={() => setShowRaw(false)} title="Close">✕</button>
+              </div>
+            </div>
+            <div className="costScroll">
+              {rawLoading && <p className="finMuted" style={{ padding: "14px 18px" }}>Loading...</p>}
+              {!rawLoading && (
+                <table className="costTable">
+                  <thead><tr><th>Order ID</th><th>Status</th><th>Total</th><th>Product ID</th><th>SKU ID</th><th>Product name</th></tr></thead>
+                  <tbody>
+                    {(rawOrders || []).length === 0 && <tr><td colSpan={6} className="costEmpty">No synced orders yet.</td></tr>}
+                    {(rawOrders || []).flatMap((order) => (order.items.length ? order.items : [{}]).map((item, index) => (
+                      <tr key={order.orderId + "-" + index}>
+                        <th><code>{order.orderId}</code></th>
+                        <td className="costName">{order.status}</td>
+                        <td className="costSold">{order.currency} {order.totalAmount}</td>
+                        <td className="costName"><code>{item.productId || "-"}</code></td>
+                        <td className="costName"><code>{item.skuId || "-"}</code></td>
+                        <td className="costName">{item.productName || "-"}</td>
+                      </tr>
+                    )))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+        )}
+
         {showCosts && (
           <section className="costPanel">
             <div className="costPanelHead">
